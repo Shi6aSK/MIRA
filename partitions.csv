@@ -1,0 +1,6 @@
+# ESP32S3 XIAO – 8 MB flash partition table
+# Gives 4 MB to the factory app (required for ESP-DL model in rodata).
+# Name,   Type, SubType, Offset,   Size,   Flags
+nvs,      data, nvs,     0x9000,   0x6000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  0x3F0000,

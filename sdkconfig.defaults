@@ -1,0 +1,23 @@
+# sdkconfig.defaults – XIAO ESP32S3 Sense
+# After editing this file, delete sdkconfig and run:
+#   idf.py reconfigure
+# then rebuild.
+
+# 8 MB flash (board has W25Q64)
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+
+# Custom partition table giving 4 MB to the app (needed for ESP-DL model)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# PSRAM – OPI 8 MB @ 80 MHz (required for ESP-DL face detection)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+CONFIG_SPIRAM_USE_MALLOC=y
+
+# Camera SCCB – keep on I2C_NUM_1 (OLED uses I2C_NUM_0)
+CONFIG_SCCB_HARDWARE_I2C_DRIVER_NEW=y
+CONFIG_SCCB_HARDWARE_I2C_PORT1=y

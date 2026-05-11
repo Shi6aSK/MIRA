@@ -1,0 +1,13 @@
+requests
+pyserial
+Pillow
+PyQt5
+numpy
+scipy
+sounddevice
+pyttsx3
+transformers
+torch
+accelerate
+sentencepiece
+safetensors
