@@ -44,14 +44,16 @@ PROMPT_POINT  = (
 )
 
 
-# ---------------------------------------------------------------------------# TTS — Groq PlayAI (Zara – natural Indian-English female voice)
-# Falls back silently if sounddevice / pydub not installed.
 # ---------------------------------------------------------------------------
-_TTS_VOICE = 'Zara'     # PlayAI Indian-English female; others: Aaliyah, Anika
-_TTS_MODEL = 'playai-tts'
+# TTS — Groq Orpheus v1 English (diana — clear female voice)
+# Valid voices: autumn, diana, hannah (female)  austin, daniel, troy (male)
+# Falls back silently if sounddevice not installed.
+# ---------------------------------------------------------------------------
+_TTS_VOICE = 'diana'
+_TTS_MODEL = 'canopylabs/orpheus-v1-english'
 
 def speak_result(text):
-    """Send text to Groq TTS and play the audio in a background thread."""
+    """Send text to Groq Orpheus TTS and play the WAV in a background thread."""
     api_key = os.environ.get('GROQ_API_KEY')
     if not api_key:
         return
@@ -61,7 +63,7 @@ def speak_result(text):
                 'model': _TTS_MODEL,
                 'voice': _TTS_VOICE,
                 'input': text,
-                'response_format': 'mp3',
+                'response_format': 'wav',
             }).encode()
             req = urllib.request.Request(
                 'https://api.groq.com/openai/v1/audio/speech',
@@ -70,21 +72,27 @@ def speak_result(text):
                          'Content-Type': 'application/json',
                          'User-Agent': 'Mozilla/5.0'},
             )
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                mp3_bytes = resp.read()
-            # Play with pydub + sounddevice (both in requirements.txt)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                wav_bytes = resp.read()
+            # WAV — play directly with sounddevice (no pydub/ffmpeg needed)
             import numpy as np
             import sounddevice as sd
-            from pydub import AudioSegment
-            seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format='mp3')
-            samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
-            samples /= 2 ** (seg.sample_width * 8 - 1)
-            if seg.channels == 2:
+            import wave
+            with wave.open(io.BytesIO(wav_bytes)) as wf:
+                rate = wf.getframerate()
+                n_ch = wf.getnchannels()
+                sw   = wf.getsampwidth()
+                raw  = wf.readframes(wf.getnframes())
+            dtype = {1: np.int8, 2: np.int16, 4: np.int32}[sw]
+            samples = np.frombuffer(raw, dtype=dtype).astype(np.float32)
+            samples /= 2 ** (sw * 8 - 1)
+            if n_ch == 2:
                 samples = samples.reshape(-1, 2)
-            sd.play(samples, samplerate=seg.frame_rate, blocking=True)
+            print('[tts] Speaking...')
+            sd.play(samples, samplerate=rate, blocking=True)
             print('[tts] Done.')
         except ImportError:
-            print('[tts] pydub/sounddevice not installed — skipping audio playback')
+            print('[tts] sounddevice not installed — skipping audio playback')
         except Exception as exc:
             print(f'[tts] Error: {exc}')
     threading.Thread(target=_speak, daemon=True).start()
