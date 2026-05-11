@@ -14,6 +14,7 @@
 #include "freertos/semphr.h"
 
 #include "servo_control.h"
+#include "mic_capture.h"
 
 static const char *TAG = "http";
 
@@ -341,7 +342,8 @@ static const char ROOT_HTML[] =
     "</div></div>"
     "<div class='p'><h3>Gemma Vision</h3>"
     "<div class='r' style='justify-content:center;margin-bottom:6px'>"
-    "<button class='bg' onclick='askGemma()'>&#128065; Describe Scene</button></div>"
+    "<button class='bg' onclick='askGemma()'>&#128065; Describe Scene</button>"
+    "<button class='bs' onclick='recMic()' id='bmic'>&#127908; Record</button></div>"
     "<div id='gsts' style='color:#888;font-size:10px'>idle &ndash; run tools/gemma_proxy.py on host PC</div>"
     "<div id='gdesc' style='font-size:11px;line-height:1.6;color:#ccc;margin-top:4px;min-height:50px'></div></div>"
     "</div>"
@@ -383,6 +385,7 @@ static const char ROOT_HTML[] =
     ".catch(function(){});}"
     "var gPend=false;"
     "function askGemma(){fetch('/gemma?trigger=1').then(function(r){return r.json();}).then(function(){gPend=true;document.getElementById('gsts').textContent='waiting for proxy...';}).catch(function(){});}"
+    "function recMic(){var b=document.getElementById('bmic');b.disabled=true;b.textContent='\\u23fa Recording...';fetch('/mic').then(function(){setTimeout(function(){b.disabled=false;b.textContent='&#127908; Record';},2500);}).catch(function(){b.disabled=false;b.textContent='&#127908; Record';});}"
     "function pollGemma(){if(!gPend)return;"
     "fetch('/gemma').then(function(r){return r.json();}).then(function(j){"
     "if(j.result&&j.result.length>0&&!j.pending){document.getElementById('gdesc').textContent=j.result;"
@@ -395,6 +398,15 @@ static const char ROOT_HTML[] =
     "function sc(){fetch('/servo?center=1').catch(function(){});}"
     "mk();setInterval(rd,500);setInterval(rs,2000);setInterval(pollGemma,1000);"
     "</script></body></html>";
+
+static esp_err_t mic_handler(httpd_req_t *req)
+{
+    set_cors(req);
+    mic_capture_async(MIC_DURATION_MS);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"recording\":true}");
+    return ESP_OK;
+}
 
 static esp_err_t root_handler(httpd_req_t *req)
 {
@@ -433,8 +445,9 @@ esp_err_t web_server_start(void)
         { .uri = "/cam",          .method = HTTP_GET,  .handler = cam_handler          },
         { .uri = "/gemma",        .method = HTTP_GET,  .handler = gemma_handler        },
         { .uri = "/gemma_result", .method = HTTP_POST, .handler = gemma_result_handler },
+        { .uri = "/mic",          .method = HTTP_GET,  .handler = mic_handler          },
     };
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 11; i++)
         httpd_register_uri_handler(server, &uris[i]);
 
     ESP_LOGW(TAG, "HTTP server on :%d  –  open http://<IP>/ in a browser", HTTP_PORT);

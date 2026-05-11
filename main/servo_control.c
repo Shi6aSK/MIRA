@@ -1,9 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "vision_config.h"
 #include "servo_control.h"
@@ -13,6 +16,16 @@ static const char *TAG = "servo";
 static bool s_pan_invert  = SERVO_PAN_INVERT  ? true : false;
 static bool s_tilt_invert = SERVO_TILT_INVERT ? true : false;
 static bool s_inited      = false;
+
+/* ── Smooth glide: target vs current (float) positions ─────── */
+/* EMA alpha: higher = faster / snappier, lower = slower / smoother */
+#define SERVO_SMOOTH_ALPHA  0.12f   /* 0.0-1.0 */
+#define SERVO_GLIDE_PERIOD_MS 20
+
+static float s_pan_target  = SERVO_CENTER_DEG;
+static float s_tilt_target = SERVO_CENTER_DEG;
+static float s_pan_cur     = SERVO_CENTER_DEG;
+static float s_tilt_cur    = SERVO_CENTER_DEG;
 
 void servo_set_invert(bool pan_invert, bool tilt_invert)
 {
@@ -26,7 +39,7 @@ void servo_get_invert(bool *pan_invert, bool *tilt_invert)
     if (tilt_invert) *tilt_invert = s_tilt_invert;
 }
 static bool s_tracking = false;
-static int s_pan_deg = SERVO_CENTER_DEG;
+static int s_pan_deg  = SERVO_CENTER_DEG;
 static int s_tilt_deg = SERVO_CENTER_DEG;
 static uint64_t s_last_track_us = 0;
 
@@ -48,11 +61,35 @@ static uint32_t deg_to_duty(int deg)
     return (uint32_t)((pulse_us * duty_max) / period_us);
 }
 
-static void servo_apply(ledc_channel_t channel, int deg)
+static void servo_apply_raw(ledc_channel_t channel, float deg)
 {
-    uint32_t duty = deg_to_duty(deg);
+    uint32_t duty = deg_to_duty((int)(deg + 0.5f));
     ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
+}
+
+/* Glide task: runs every 20 ms, slides current → target via EMA */
+static void servo_glide_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(SERVO_GLIDE_PERIOD_MS));
+        if (!s_inited) continue;
+
+        s_pan_cur  += SERVO_SMOOTH_ALPHA * (s_pan_target  - s_pan_cur);
+        s_tilt_cur += SERVO_SMOOTH_ALPHA * (s_tilt_target - s_tilt_cur);
+
+        /* Only write PWM if position changed more than 0.1 deg */
+        static float last_pan = -999, last_tilt = -999;
+        if (fabsf(s_pan_cur  - last_pan)  > 0.1f) {
+            servo_apply_raw(LEDC_CHANNEL_1, s_pan_cur);
+            last_pan = s_pan_cur;
+        }
+        if (fabsf(s_tilt_cur - last_tilt) > 0.1f) {
+            servo_apply_raw(LEDC_CHANNEL_2, s_tilt_cur);
+            last_tilt = s_tilt_cur;
+        }
+    }
 }
 
 void servo_init(void)
@@ -95,34 +132,34 @@ void servo_init(void)
         return;
     }
 
-    s_pan_deg = SERVO_CENTER_DEG;
-    s_tilt_deg = SERVO_CENTER_DEG;
+    s_pan_deg    = SERVO_CENTER_DEG;
+    s_tilt_deg   = SERVO_CENTER_DEG;
+    s_pan_cur    = SERVO_CENTER_DEG;
+    s_tilt_cur   = SERVO_CENTER_DEG;
+    s_pan_target = SERVO_CENTER_DEG;
+    s_tilt_target= SERVO_CENTER_DEG;
     s_inited = true;
-    ESP_LOGI(TAG, "Servo initialized (pan=%d tilt=%d)", s_pan_deg, s_tilt_deg);
+
+    /* Start smooth glide task (pinned to core 1, low priority) */
+    xTaskCreatePinnedToCore(servo_glide_task, "svo_glide", 1024, NULL, 2, NULL, 1);
+
+    ESP_LOGI(TAG, "Servo initialized with EMA smoothing (pan=%d tilt=%d)", s_pan_deg, s_tilt_deg);
 }
 
 void servo_set_pan(int deg)
 {
-    if (!s_inited) {
-        servo_init();
-    }
-    if (!s_inited) {
-        return;
-    }
-    s_pan_deg = clamp_deg(deg);
-    servo_apply(LEDC_CHANNEL_1, s_pan_deg);
+    if (!s_inited) servo_init();
+    if (!s_inited) return;
+    s_pan_deg    = clamp_deg(deg);
+    s_pan_target = (float)s_pan_deg;   /* glide task will ease toward this */
 }
 
 void servo_set_tilt(int deg)
 {
-    if (!s_inited) {
-        servo_init();
-    }
-    if (!s_inited) {
-        return;
-    }
-    s_tilt_deg = clamp_deg(deg);
-    servo_apply(LEDC_CHANNEL_2, s_tilt_deg);
+    if (!s_inited) servo_init();
+    if (!s_inited) return;
+    s_tilt_deg    = clamp_deg(deg);
+    s_tilt_target = (float)s_tilt_deg;
 }
 
 void servo_center(void)

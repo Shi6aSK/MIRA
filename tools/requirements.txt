@@ -5,6 +5,7 @@ PyQt5
 numpy
 scipy
 sounddevice
+pydub
 pyttsx3
 transformers
 torch
