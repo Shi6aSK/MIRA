@@ -695,33 +695,28 @@ flowchart TD
         <div class="fig-label">Figure 4 &mdash; Activation State Machine</div>
         <div class="diagram-wrap">
           <pre class="mermaid">
-stateDiagram-v2
-    direction TD
-    [*] --> Idle
-    Idle --> FaceDetected : face_detected
-    FaceDetected --> Idle : face_lost
-    FaceDetected --> GestureGate : gate_elapsed (2 s)
-    GestureGate --> FaceDetected : face_lost / closed_fist
-    GestureGate --> Voice : open_palm
-    GestureGate --> Vision : point
-    Voice --> FaceDetected : response_complete
-    Vision --> FaceDetected : response_complete
-
-    state Idle {
-        note: Camera DMA off · Servo resting\nMin power draw
-    }
-    state FaceDetected {
-        note: Camera active · Servo tracking\n2-s presence gate
-    }
-    state GestureGate {
-        note: Monitoring gesture in ROI\nNo mic / LLM / network
-    }
-    state Voice {
-        note: Mic DMA active · Audio captured\nLLM query · TTS response
-    }
-    state Vision {
-        note: Frame snapshot captured\nLLM object query · TTS
-    }
+flowchart TD
+    START(["&#9679; Start"]) --> IDLE
+    IDLE["<b>IDLE</b><br/>Camera DMA off · Servo resting<br/>Min power draw"]
+    IDLE -->|face_detected| FACE
+    FACE["<b>FACE DETECTED</b><br/>Camera active · Servo tracking<br/>2-s presence gate running"]
+    FACE -->|face_lost| IDLE
+    FACE -->|gate elapsed 2s| GATE
+    GATE["<b>GESTURE GATE</b><br/>Monitoring gesture in ROI<br/>No mic / LLM / network"]
+    GATE -->|face_lost| IDLE
+    GATE -->|open_palm| VOICE
+    GATE -->|point| VISION
+    GATE -->|closed_fist| FACE
+    VOICE["<b>VOICE</b><br/>Mic DMA active<br/>Audio → LLM → TTS"]
+    VISION["<b>VISION</b><br/>Frame snapshot captured<br/>Image → LLM → TTS"]
+    VOICE -->|response_complete| FACE
+    VISION -->|response_complete| FACE
+    classDef state fill:#1e1e28,stroke:#c0501a,color:#eaeaed,rx:6;
+    classDef priv fill:#1a2e1a,stroke:#2d7a4a,color:#b8e0c8,rx:6;
+    classDef start fill:#2a1a10,stroke:#e0703a,color:#e0b080;
+    class IDLE,FACE,GATE state;
+    class VOICE,VISION priv;
+    class START start;
           </pre>
         </div>        <p class="fig-caption">Figure 4 &mdash; Six-state interaction FSM. Privacy-sensitive resources (microphone DMA, LLM API) are only accessible from the VOICE or VISION states, which require traversal through the 2-second face-presence gate.</p>
       </div>
