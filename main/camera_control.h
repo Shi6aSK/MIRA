@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-// Initialise OV2640 in RGB565 mode (240x240, PSRAM frame buffers).
+// Initialise OV3660 in RGB565 mode (320x240, PSRAM frame buffers).
 esp_err_t camera_init(void);
 
 // Get the latest frame buffer (call camera_return when done).

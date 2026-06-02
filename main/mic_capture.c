@@ -19,6 +19,8 @@ static const char *TAG = "mic";
 static i2s_chan_handle_t s_rx_chan = NULL;
 static bool s_inited = false;
 static volatile bool s_busy = false;
+static char          s_last_path[64] = "";
+static volatile bool s_audio_ready   = false;
 
 esp_err_t mic_init(void)
 {
@@ -157,9 +159,18 @@ static void capture_task(void *arg)
     free(buf);
 
     ESP_LOGI(TAG, "Saved %lu bytes to %s", (unsigned long)written, path);
+    /* Mark the recording ready for the web server / proxy to consume */
+    strncpy(s_last_path, path, sizeof(s_last_path) - 1);
+    s_last_path[sizeof(s_last_path) - 1] = '\0';
+    s_audio_ready = true;
     s_busy = false;
     vTaskDelete(NULL);
 }
+
+bool mic_is_busy(void) { return s_busy; }
+const char *mic_get_last_path(void)       { return s_last_path; }
+bool        mic_audio_ready(void)         { return s_audio_ready; }
+void        mic_clear_audio_ready(void)   { s_audio_ready = false; }
 
 void mic_capture_async(int duration_ms)
 {

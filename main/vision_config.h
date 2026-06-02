@@ -1,8 +1,8 @@
 #pragma once
 
 /* ── WiFi ───────────────────────────────────────────────── */
-#define WIFI_SSID        "YOUR_SSID"
-#define WIFI_PASS        "YOUR_PASSWORD"
+#define WIFI_SSID        "Cribbo"
+#define WIFI_PASS        "7fc5xzb38v4"
 #define WIFI_MAX_RETRY   10
 
 /* ── HTTP server ────────────────────────────────────────── */
@@ -27,13 +27,14 @@
 #define PCLK_GPIO_NUM   13
 
 /* ── Frame ──────────────────────────────────────────────── */
-#define FRAME_WIDTH     240
+#define FRAME_WIDTH     320
 #define FRAME_HEIGHT    240
-#define JPEG_QUALITY    8    /* 0=best, 63=worst */
+#define JPEG_QUALITY    8    /* sensor hw JPEG register (0=best, 63=worst) – irrelevant in RGB565 mode */
+#define STREAM_JPEG_QUALITY 80  /* fmt2jpg / jpge quality (1-100, higher=better) for MJPEG web stream */
 
 /* ── Face detection thresholds ─────────────────────────── */
-#define FACE_SCORE_MSR  0.20f   /* lowered: noisy OV2640 image reduces model confidence */
-#define FACE_SCORE_MNP  0.30f
+#define FACE_SCORE_MSR  0.30f   /* Lowered from 0.45 – accepts weaker/smaller/partially occluded faces */
+#define FACE_SCORE_MNP  0.35f
 
 /* ── Hand/skin blob ─────────────────────────────────────── */
 #define BLOCK_SIZE           8
@@ -51,8 +52,8 @@
 #define SERVO_TRACK_STEP_DEG  2
 #define SERVO_TRACK_DEADBAND_PX 5   /* tighter deadband so tilt/pan react sooner */
 #define SERVO_TRACK_INTERVAL_MS 100
-#define SERVO_PAN_INVERT      1   /* 1=reverse – pan servo is mounted inverted */
-#define SERVO_TILT_INVERT     1
+#define SERVO_PAN_INVERT      0   /* OV3660 outputs correctly-oriented frames; pan servo direction correct */
+#define SERVO_TILT_INVERT     1   /* tilt servo is physically mounted inverted – mechanical, not camera-related */
 #define SERVO_PULSE_MIN_US    500
 #define SERVO_PULSE_MAX_US    2500
 
@@ -71,7 +72,7 @@
 /* ── PDM Microphone (XIAO ESP32S3 Sense built-in) ───────────── */
 #define MIC_CLK_GPIO  42   /* PDM clock – D8 on Sense expansion */
 #define MIC_DATA_GPIO 41   /* PDM data  – D7 on Sense expansion */
-#define MIC_DURATION_MS 2000   /* default capture duration */
+#define MIC_DURATION_MS 5000   /* capture duration for open_palm gesture (5 s) */
 
 /* ── Gesture trigger cooldown ───────────────────────────────── */
 #define GESTURE_CONFIRM_FRAMES  3    /* consecutive frames before trigger */

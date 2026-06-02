@@ -23,9 +23,11 @@ void vision_process_frame(camera_fb_t *fb);
 // Thread-safe read of the latest detection result.
 detection_t vision_get_detection(void);
 
-// Copy the last computed skin-blob grid mask.
-// out must be VISION_GW * VISION_GH bytes (30*30 = 900 for 240x240 / block 8).
-void vision_get_blob_mask(uint8_t *out);
+// Get the normalized geometric features of the last detected skin blob.
+// ar      : aspect ratio (blob bbox width / height in grid cells)
+// fill    : fill ratio (skin cells / total bbox cells)
+// cy_norm : vertical centroid normalized to [0,1] (0=top, 1=bottom of bbox)
+void vision_get_blob_features(float *ar, float *fill, float *cy_norm);
 
 #ifdef __cplusplus
 }

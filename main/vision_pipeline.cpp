@@ -17,6 +17,7 @@ extern "C" {
 #include "vision_types.h"
 #include "servo_control.h"
 #include "oled_control.h"
+#include "training.h"
 }
 
 static const char *TAG = "vision";
@@ -44,9 +45,15 @@ static inline bool is_skin(int r, int g, int b)
 static uint8_t s_mask[GW * GH];
 static uint8_t s_vis [GW * GH];
 static int     s_q   [GW * GH];
-static uint8_t s_blob_mask_saved[GW * GH]; // last skin-blob mask, exposed for training
+/* Last computed blob features – exposed for gesture training capture */
+static float s_last_ar   = 1.0f;
+static float s_last_fill = 0.5f;
+static float s_last_cy   = 0.5f;
 
-static bool detect_hand(const uint8_t *rgb565, int w, int h, detection_t *out)
+/* fx1..fy2 = face bounding box in pixels. Those grid cells are zeroed before
+ * BFS so the face skin (always the largest blob) can't win over the hand. */
+static bool detect_hand(const uint8_t *rgb565, int w, int h, detection_t *out,
+                         int fx1, int fy1, int fx2, int fy2)
 {
     const int gw = w / BLOCK_SIZE, gh = h / BLOCK_SIZE;
     memset(s_mask, 0, (size_t)(gw * gh));
@@ -72,8 +79,22 @@ static bool detect_hand(const uint8_t *rgb565, int w, int h, detection_t *out)
         }
     }
 
-    // Snapshot the full skin mask for gesture training (before BFS overwrites s_vis)
-    memcpy(s_blob_mask_saved, s_mask, (size_t)(gw * gh));
+    /* Erase the face region from the skin grid. Without this the face is always
+     * the largest blob (neck + cheeks >> hand area) and gesture features are
+     * computed from the face shape instead of the hand shape. */
+    {
+        int fbx1 = fx1 / BLOCK_SIZE, fby1 = fy1 / BLOCK_SIZE;
+        int fbx2 = fx2 / BLOCK_SIZE, fby2 = fy2 / BLOCK_SIZE;
+        /* Expand the face mask by 1 block in each direction to catch
+         * neck/chin skin that bleeds outside the tight face bbox. */
+        fbx1 = (fbx1 > 0)     ? fbx1 - 1 : 0;
+        fby1 = (fby1 > 0)     ? fby1 - 1 : 0;
+        fbx2 = (fbx2 < gw-1)  ? fbx2 + 1 : gw - 1;
+        fby2 = (fby2 < gh-1)  ? fby2 + 1 : gh - 1;
+        for (int mby = fby1; mby <= fby2; mby++)
+            for (int mbx = fbx1; mbx <= fbx2; mbx++)
+                s_mask[mby * gw + mbx] = 0;
+    }
 
     int best = 0, bx1 = 0, by1 = 0, bx2 = 0, by2 = 0;
     for (int i = 0; i < gw * gh; i++) {
@@ -105,11 +126,34 @@ static bool detect_hand(const uint8_t *rgb565, int w, int h, detection_t *out)
     out->x1 = bx1 * BLOCK_SIZE;       out->y1 = by1 * BLOCK_SIZE;
     out->x2 = (bx2 + 1) * BLOCK_SIZE - 1; out->y2 = (by2 + 1) * BLOCK_SIZE - 1;
     strcpy(out->kind, "hand");
-    int bw = out->x2 - out->x1 + 1, bh = out->y2 - out->y1 + 1;
-    float ar = (bh > 0) ? (float)bw / bh : 1.0f;
-    if      (ar > GESTURE_ASPECT_WIDE)   strcpy(out->gesture, "open_palm");
-    else if (ar < GESTURE_ASPECT_NARROW) strcpy(out->gesture, "point");
-    else                                 strcpy(out->gesture, "hand");
+    /* Compute normalized geometric features – invariant to position and scale.
+     * ar   = aspect ratio (bbox width / height in grid cells)
+     * fill = fraction of bbox grid cells that are skin
+     * cy_n = normalized vertical centroid of skin mass (0=top, 1=bottom) */
+    float ar    = (by2 > by1) ? (float)(bx2 - bx1 + 1) / (float)(by2 - by1 + 1) : 1.0f;
+    float denom = (float)((bx2 - bx1 + 1) * (by2 - by1 + 1));
+    float fill  = (denom > 0.0f) ? (float)best / denom : 0.5f;
+    float sum_y = 0.0f, cnt_f = 0.0f;
+    for (int gy = by1; gy <= by2; gy++)
+        for (int gx = bx1; gx <= bx2; gx++)
+            if (s_mask[gy * gw + gx]) { sum_y += (float)(gy - by1); cnt_f += 1.0f; }
+    float cy_n = (cnt_f > 0.0f && by2 > by1) ? sum_y / cnt_f / (float)(by2 - by1) : 0.5f;
+    s_last_ar = ar; s_last_fill = fill; s_last_cy = cy_n;
+    /* Use KNN on feature vector when templates are loaded; reliable geometric
+     * heuristic otherwise – both are position/scale invariant.
+     * Thresholds measured with face region masked out:
+     *   open_palm : spread fingers → wide blob, high fill.  ar≥0.75, fill≥0.45
+     *   point     : single upright finger → tall narrow blob, low fill.  ar<0.65
+     *   hand      : fist / ambiguous – no action, but still captured in training */
+    const char *knn_label = gesture_knn_classify(ar, fill, cy_n);
+    if (knn_label) {
+        strncpy(out->gesture, knn_label, sizeof(out->gesture) - 1);
+        out->gesture[sizeof(out->gesture) - 1] = '\0';
+    } else {
+        if      (ar >= 0.75f && fill >= 0.45f) strcpy(out->gesture, "open_palm");
+        else if (ar <  0.65f && fill <  0.55f) strcpy(out->gesture, "point");
+        else                                   strcpy(out->gesture, "hand");
+    }
     int cx = (out->x1 + out->x2) / 2;
     if      (cx < w / 3)      strcpy(out->side, "left");
     else if (cx > 2 * w / 3)  strcpy(out->side, "right");
@@ -169,8 +213,9 @@ void vision_process_frame(camera_fb_t *fb)
             else if (cx > 2 * (int)fb->width / 3)  strcpy(d.side, "right");
             else                                    strcpy(d.side, "center");
 
-            /* Negate pdx: OLED mirror is right-of-scene = left-of-display */
-            int pdx = -(int)((float)(cx - (int)fb->width  / 2) / (fb->width  / 2) * 20.0f);
+            /* pdx: positive = pupils right on display. Face right-of-centre → pupils right.
+             * pdy: positive = pupils down. Face below centre → pupils down. */
+            int pdx =  (int)((float)(cx - (int)fb->width  / 2) / (fb->width  / 2) * 20.0f);
             int pdy =  (int)((float)(cy - (int)fb->height / 2) / (fb->height / 2) *  6.0f);
             oled_draw_eyes(pdx, pdy, true);
             servo_update_tracking(&d, (int)fb->width, (int)fb->height);
@@ -183,9 +228,12 @@ void vision_process_frame(camera_fb_t *fb)
         strcpy(hand.kind, "none");
         strcpy(hand.gesture, "none");
         strcpy(hand.side, "none");
-        if (detect_hand(fb->buf, (int)fb->width, (int)fb->height, &hand)) {
+        if (detect_hand(fb->buf, (int)fb->width, (int)fb->height, &hand,
+                         d.x1, d.y1, d.x2, d.y2)) {
             strncpy(d.gesture, hand.gesture, sizeof(d.gesture) - 1);
             d.gesture[sizeof(d.gesture) - 1] = '\0';
+            d.hx1 = hand.x1; d.hy1 = hand.y1;
+            d.hx2 = hand.x2; d.hy2 = hand.y2;
         }
     } else {
         oled_draw_sleep();
@@ -204,9 +252,11 @@ detection_t vision_get_detection(void)
     return d;
 }
 
-void vision_get_blob_mask(uint8_t *out)
+void vision_get_blob_features(float *ar, float *fill, float *cy_norm)
 {
-    if (out) memcpy(out, s_blob_mask_saved, sizeof(s_blob_mask_saved));
+    if (ar)      *ar      = s_last_ar;
+    if (fill)    *fill    = s_last_fill;
+    if (cy_norm) *cy_norm = s_last_cy;
 }
 
 } // extern "C"

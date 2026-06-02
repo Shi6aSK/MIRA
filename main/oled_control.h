@@ -17,6 +17,14 @@ void oled_draw_eyes(int pupil_dx, int pupil_dy, bool face_seen);
 // Draw closed/sleep eyes (no face present).
 void oled_draw_sleep(void);
 
+// Draw happy-squint "UwU" face with sound-wave arcs: shown while mic is recording.
+// Suppresses oled_draw_eyes/sleep for ~2.5 s so the sign stays visible.
+void oled_draw_recording(void);
+
+// Draw thinking face (pupils up-left, dots below): shown while Gemma is processing.
+// Also suppresses normal eye drawing for ~2.5 s.
+void oled_draw_thinking(void);
+
 #ifdef __cplusplus
 }
 #endif

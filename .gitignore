@@ -83,3 +83,33 @@ gemma/*.bin
 *.workspace # General workspace files, can be from various tools
 *.suo       # Visual Studio Solution User Options
 *.sln.docstates # Visual Studio
+
+# Root-level media (served via docs/media/ instead)
+/demo.mp4
+/training.mp4
+/MIRA_withmmWaveSensor_at_bottom.jpeg
+
+# Tool outputs / captured frames
+tools/last_frame.png
+tools/__pycache__/
+backend/__pycache__/
+
+# sdkconfig (generated, contains secrets like Wi-Fi credentials)
+sdkconfig
+
+# Misc build/script artifacts
+build_output.txt
+script.md
+partitions.csv
+
+# Generated TTS audio files
+*.wav
+
+# IDE / editor configs
+.clangd
+.vscode/
+.devcontainer/
+
+# docs/media is tracked — do NOT ignore
+!docs/
+!docs/media/

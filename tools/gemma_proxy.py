@@ -43,14 +43,42 @@ PROMPT_POINT  = (
     'Answer in five words or fewer, e.g. "a red coffee mug".'
 )
 
+PROMPT_AUDIO = (
+    'You are MIRA, a small friendly AI assistant built into an embedded device. '
+    'The user just spoke the following to you: "{transcript}". '
+    'Answer their question or respond to their request directly and helpfully. '
+    'Be concise — two sentences maximum. Do NOT repeat or echo what they said. '
+    'Respond as if speaking out loud to the user.'
+)
+
 
 # ---------------------------------------------------------------------------
-# TTS — Groq Orpheus v1 English (diana — clear female voice)
+# TTS — Groq Orpheus v1 English
+# Note: Orpheus has no Indian-accent voice. 'hannah' is the warmest female
+# voice available. The cartoon-robot filter below compensates with a cute,
+# high-pitched robotic timbre.
 # Valid voices: autumn, diana, hannah (female)  austin, daniel, troy (male)
 # Falls back silently if sounddevice not installed.
 # ---------------------------------------------------------------------------
-_TTS_VOICE = 'diana'
+_TTS_VOICE = 'hannah'
 _TTS_MODEL = 'canopylabs/orpheus-v1-english'
+
+
+def _apply_cartoon_robot(samples, rate):
+    """Pitch-shift up ~35% + ring-modulate at 65 Hz → small cartoon-robot voice."""
+    import numpy as np
+    # Pitch up: linearly resample to fewer samples, then play at original rate
+    # (fewer samples at same rate = plays faster = higher pitch, like a chipmunk/robot)
+    factor  = 1
+    new_len = max(1, int(len(samples) / factor))
+    src_t   = np.linspace(0.0, 1.0, len(samples))
+    dst_t   = np.linspace(0.0, 1.0, new_len)
+    shifted = np.interp(dst_t, src_t, samples).astype(np.float32)
+    # Ring modulation at 65 Hz for a buzzed robotic quality
+    t        = np.arange(new_len, dtype=np.float32) / rate
+    carrier  = np.sin(2.0 * np.pi * 80.0 * t)
+    return (shifted * (0.70 + 0.30 * carrier)).astype(np.float32)
+
 
 def speak_result(text):
     """Send text to Groq Orpheus TTS and play the WAV in a background thread."""
@@ -82,13 +110,18 @@ def speak_result(text):
                 rate = wf.getframerate()
                 n_ch = wf.getnchannels()
                 sw   = wf.getsampwidth()
-                raw  = wf.readframes(wf.getnframes())
+                raw  = wf.readframes(2 ** 30)  # read all; getnframes() unreliable for streaming WAV
             dtype = {1: np.int8, 2: np.int16, 4: np.int32}[sw]
             samples = np.frombuffer(raw, dtype=dtype).astype(np.float32)
             samples /= 2 ** (sw * 8 - 1)
             if n_ch == 2:
-                samples = samples.reshape(-1, 2)
-            print('[tts] Speaking...')
+                # apply effect per channel, then interleave back
+                left  = _apply_cartoon_robot(samples[:, 0], rate)
+                right = _apply_cartoon_robot(samples[:, 1], rate)
+                samples = np.column_stack((left, right))
+            else:
+                samples = _apply_cartoon_robot(samples, rate)
+            print('[tts] Speaking (cartoon-robot filter active)...')
             sd.play(samples, samplerate=rate, blocking=True)
             print('[tts] Done.')
         except ImportError:
@@ -293,6 +326,85 @@ def post_result(text):
 
 
 # ---------------------------------------------------------------------------
+# Audio transcription (Groq Whisper) + LLM reply chain
+# ---------------------------------------------------------------------------
+def _make_multipart(fields, files):
+    import random, string
+    boundary = ''.join(random.choices(string.ascii_letters, k=20)).encode()
+    body = b''
+    for name, value in fields:
+        body += b'--' + boundary + b'\r\n'
+        body += f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
+        body += value.encode() + b'\r\n'
+    for name, filename, data in files:
+        body += b'--' + boundary + b'\r\n'
+        body += f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode()
+        body += b'Content-Type: audio/wav\r\n\r\n'
+        body += data + b'\r\n'
+    body += b'--' + boundary + b'--\r\n'
+    return body, f'multipart/form-data; boundary={boundary.decode()}'
+
+
+def transcribe_audio(wav_bytes):
+    """Transcribe WAV bytes using Groq Whisper-large-v3."""
+    api_key = os.environ.get('GROQ_API_KEY')
+    if not api_key:
+        print('[audio] No GROQ_API_KEY — skipping transcription')
+        return None
+    try:
+        body, ct = _make_multipart(
+            [('model', 'whisper-large-v3'), ('language', 'en'), ('response_format', 'json')],
+            [('file', 'recording.wav', wav_bytes)],
+        )
+        req = urllib.request.Request(
+            'https://api.groq.com/openai/v1/audio/transcriptions',
+            data=body, method='POST',
+            headers={'Authorization': f'Bearer {api_key}',
+                     'Content-Type': ct,
+                     'User-Agent': 'Mozilla/5.0'},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+        transcript = result.get('text', '').strip()
+        print(f'[audio] Transcript: {transcript[:80]}')
+        return transcript
+    except Exception as exc:
+        print(f'[audio] Whisper error: {exc}')
+        return None
+
+
+def run_audio_chain(wav_bytes):
+    """Transcribe then get an LLM reply. Returns the combined result string."""
+    transcript = transcribe_audio(wav_bytes)
+    if not transcript:
+        return 'Sorry, I could not hear that clearly.'
+    api_key = os.environ.get('GROQ_API_KEY')
+    if api_key:
+        try:
+            prompt = PROMPT_AUDIO.format(transcript=transcript)
+            payload = {
+                'model': 'llama-3.3-70b-versatile',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 80,
+            }
+            req = urllib.request.Request(
+                'https://api.groq.com/openai/v1/chat/completions',
+                data=json.dumps(payload).encode(), method='POST',
+                headers={'Authorization': f'Bearer {api_key}',
+                         'Content-Type': 'application/json',
+                         'User-Agent': 'Mozilla/5.0'},
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read())
+            reply = body['choices'][0]['message']['content'].strip()
+            print(f'[audio] Reply: {reply[:80]}')
+            return reply
+        except Exception as exc:
+            print(f'[audio] LLM error: {exc}')
+    return f'I heard: \u201c{transcript}\u201d \u2014 but I need an internet connection to answer.'
+
+
+# ---------------------------------------------------------------------------
 # Main polling loop  (runs forever; Ctrl+C to stop)
 # ---------------------------------------------------------------------------
 def main():
@@ -326,6 +438,23 @@ def main():
                     t0 = time.time()
                     result = describe_scene(jpeg, prompt)
                     print(f'[proxy] Done in {time.time() - t0:.1f} s')
+                    post_result(result)
+                    speak_result(result)
+
+            # ── Check for new audio recording ──────────────────────────────
+            with urllib.request.urlopen(f'{BASE_URL}/audio', timeout=5) as resp:
+                audio_state = json.loads(resp.read())
+            if audio_state.get('pending'):
+                fname = audio_state.get('file', '')
+                if fname:
+                    print(f'[audio] New recording: {fname} — downloading...')
+                    with urllib.request.urlopen(
+                            f'{BASE_URL}/audio_dl?f={fname}', timeout=15) as resp:
+                        wav_bytes = resp.read()
+                    print(f'[audio] Downloaded {len(wav_bytes)} B — transcribing...')
+                    t0 = time.time()
+                    result = run_audio_chain(wav_bytes)
+                    print(f'[audio] Done in {time.time() - t0:.1f} s')
                     post_result(result)
                     speak_result(result)
 

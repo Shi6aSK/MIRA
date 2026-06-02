@@ -159,6 +159,11 @@ static esp_err_t train_handler(httpd_req_t *req)
         snprintf(resp, sizeof(resp),
                  "{\"msg\":\"Training stopped\",\"count\":%d}", cnt);
 
+    } else if (strcmp(op, "gesture_clear") == 0) {
+        training_clear_gesture_templates();
+        snprintf(resp, sizeof(resp),
+                 "{\"msg\":\"Gesture templates cleared\",\"count\":0}");
+
     } else {
         /* default: status */
         static const char *names[] = {"idle", "face", "gesture"};
@@ -244,6 +249,17 @@ static char          s_gemma_result[512] = "";
 static char          s_gemma_ctx[32]     = "describe";
 static volatile bool s_gemma_pending     = false;
 
+static char          s_audio_path[64]    = "";
+static volatile bool s_audio_pending     = false;
+
+void web_server_set_audio_ready(const char *sdpath)
+{
+    if (!sdpath || !sdpath[0]) return;
+    strncpy(s_audio_path, sdpath, sizeof(s_audio_path) - 1);
+    s_audio_path[sizeof(s_audio_path) - 1] = '\0';
+    s_audio_pending = true;
+}
+
 void web_server_auto_trigger_gemma(const char *ctx)
 {
     if (s_gemma_pending) return;   /* already waiting – don't clobber */
@@ -294,6 +310,73 @@ static esp_err_t gemma_result_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ── GET /audio  – poll for new recording availability ──────── */
+static esp_err_t audio_handler(httpd_req_t *req)
+{
+    /* Extract just the filename from the full path */
+    const char *fname = s_audio_path;
+    const char *slash = strrchr(s_audio_path, '/');
+    if (slash) fname = slash + 1;
+
+    char resp[128];
+    snprintf(resp, sizeof(resp), "{\"pending\":%s,\"file\":\"%s\"}",
+             s_audio_pending ? "true" : "false", fname);
+    set_cors(req);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, resp);
+    return ESP_OK;
+}
+
+/* ── GET /audio_dl?f=NNNN.wav  – serve a WAV file from SD ───── */
+static esp_err_t audio_dl_handler(httpd_req_t *req)
+{
+    char query[64] = "";
+    httpd_req_get_url_query_str(req, query, sizeof(query));
+    char fname[48] = "";
+    if (httpd_query_key_value(query, "f", fname, sizeof(fname)) != ESP_OK || !fname[0]) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing ?f=");
+        return ESP_FAIL;
+    }
+    /* Sanitise: allow alphanumerics, dots, underscores — no slashes or ".." */
+    for (int i = 0; fname[i]; i++) {
+        char c = fname[i];
+        if (!((c >= '0' && c <= '9') ||
+              (c >= 'a' && c <= 'z') ||
+              (c >= 'A' && c <= 'Z') ||
+              c == '.' || c == '_')) {
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid filename");
+            return ESP_FAIL;
+        }
+    }
+    /* Extra guard: reject any ".." traversal attempt */
+    if (strstr(fname, "..")) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid filename");
+        return ESP_FAIL;
+    }
+    char path[80];
+    snprintf(path, sizeof(path), "/sdcard/recordings/%s", fname);
+
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found");
+        return ESP_FAIL;
+    }
+    set_cors(req);
+    httpd_resp_set_type(req, "audio/wav");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    s_audio_pending = false;  /* consumed */
+
+    char *chunk = malloc(1024);
+    if (!chunk) { fclose(f); httpd_resp_send_500(req); return ESP_FAIL; }
+    size_t n;
+    while ((n = fread(chunk, 1, 1024, f)) > 0)
+        if (httpd_resp_send_chunk(req, chunk, (ssize_t)n) != ESP_OK) break;
+    free(chunk);
+    fclose(f);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
 /* ── GET /  (dashboard) ──────────────────────────────────────── */
 static const char ROOT_HTML[] =
     "<!DOCTYPE html><html><head>"
@@ -330,6 +413,8 @@ static const char ROOT_HTML[] =
     "<button class='bf' onclick='trn(\"face_start\")'>Train Face</button>"
     "<button class='bg' onclick='trn(\"gesture_start\")'>Train Gesture</button>"
     "<button class='bs' onclick='trn(\"stop\")'>Stop</button></div>"
+    "<div class='r' style='margin-top:3px'>"
+    "<button class='bs' style='background:#6b0000' onclick='if(confirm(\"Delete ALL gesture templates?\"))trn(\"gesture_clear\")'>&#10006; Clear Gestures</button></div>"
     "<div id='sts'>idle</div></div>"
     "<div class='p'><h3>Camera Settings</h3><div id='sl'></div>"
     "<div style='margin-top:8px;border-top:1px solid #2a2a2a;padding-top:6px'>"
@@ -383,12 +468,14 @@ static const char ROOT_HTML[] =
     ".then(function(r){return r.json();})"
     ".then(function(s){document.getElementById('sts').textContent=s.msg||'ok';})"
     ".catch(function(){});}"
-    "var gPend=false;"
-    "function askGemma(){fetch('/gemma?trigger=1').then(function(r){return r.json();}).then(function(){gPend=true;document.getElementById('gsts').textContent='waiting for proxy...';}).catch(function(){});}"
+    "var gPend=false;var gLastResult='';"
+    "function askGemma(){gLastResult='';fetch('/gemma?trigger=1').then(function(r){return r.json();}).then(function(){gPend=true;document.getElementById('gsts').textContent='waiting for proxy...';}).catch(function(){});}"
     "function recMic(){var b=document.getElementById('bmic');b.disabled=true;b.textContent='\\u23fa Recording...';fetch('/mic').then(function(){setTimeout(function(){b.disabled=false;b.textContent='&#127908; Record';},2500);}).catch(function(){b.disabled=false;b.textContent='&#127908; Record';});}"
-    "function pollGemma(){if(!gPend)return;"
+    "function pollGemma(){"
     "fetch('/gemma').then(function(r){return r.json();}).then(function(j){"
-    "if(j.result&&j.result.length>0&&!j.pending){document.getElementById('gdesc').textContent=j.result;"
+    "if(j.pending&&!gPend){gPend=true;document.getElementById('gsts').textContent='waiting for proxy...';}"
+    "if(!j.pending&&j.result&&j.result!==gLastResult){gLastResult=j.result;"
+    "document.getElementById('gdesc').textContent=j.result;"
     "document.getElementById('gsts').textContent='done';gPend=false;}"
     "}).catch(function(){});}"
     "function sf(axis){"
@@ -424,7 +511,7 @@ esp_err_t web_server_start(void)
     httpd_config_t cfg    = HTTPD_DEFAULT_CONFIG();
     cfg.server_port       = HTTP_PORT;
     cfg.stack_size        = 12288;
-    cfg.max_uri_handlers  = 12;
+    cfg.max_uri_handlers  = 14;
     cfg.max_open_sockets  = 7;   /* 1 async stream + detect/train/cam/root + spares */
     cfg.lru_purge_enable  = true;
 
@@ -446,8 +533,10 @@ esp_err_t web_server_start(void)
         { .uri = "/gemma",        .method = HTTP_GET,  .handler = gemma_handler        },
         { .uri = "/gemma_result", .method = HTTP_POST, .handler = gemma_result_handler },
         { .uri = "/mic",          .method = HTTP_GET,  .handler = mic_handler          },
+        { .uri = "/audio",        .method = HTTP_GET,  .handler = audio_handler        },
+        { .uri = "/audio_dl",     .method = HTTP_GET,  .handler = audio_dl_handler     },
     };
-    for (int i = 0; i < 11; i++)
+    for (int i = 0; i < 13; i++)
         httpd_register_uri_handler(server, &uris[i]);
 
     ESP_LOGW(TAG, "HTTP server on :%d  –  open http://<IP>/ in a browser", HTTP_PORT);

@@ -1,5 +1,6 @@
 #pragma once
 #include "esp_err.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,6 +13,19 @@ esp_err_t mic_init(void);
  * Runs in a newly spawned task so the call returns immediately.
  * Safe to call from vision_task. */
 void mic_capture_async(int duration_ms);
+
+/* Returns true while a capture task is running. */
+bool mic_is_busy(void);
+
+/* Returns path of the most recently completed recording ("/sdcard/recordings/NNNN.wav").
+ * Returns "" if no recording has been made yet. */
+const char *mic_get_last_path(void);
+
+/* True after a capture finishes and before mic_clear_audio_ready() is called. */
+bool mic_audio_ready(void);
+
+/* Clear the audio-ready flag once the caller has handled the new recording. */
+void mic_clear_audio_ready(void);
 
 #ifdef __cplusplus
 }

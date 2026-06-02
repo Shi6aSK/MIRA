@@ -36,13 +36,24 @@ int          training_get_count(void);
 bool training_maybe_capture_face(const camera_fb_t *fb, const detection_t *det);
 
 // Call from vision_task after vision_process_frame().
-// Saves blob-mask binary to SD if in gesture-training mode and a gesture is detected.
-// Internally calls vision_get_blob_mask().
+// Saves a feature-vector .bin to SD if in gesture-training mode and a named
+// gesture (not "hand"/"none") is detected. Calls vision_get_blob_features().
 bool training_maybe_capture_gesture(const detection_t *det);
 
-// Scan and validate saved gesture template files on SD at startup.
-// Logs template availability and format validity for deployment checks.
+// Load all feature-vector gesture templates from SD (FEAT format) into RAM.
+// Call once after sd_init().
 void training_load_gesture_templates(void);
+
+// 1-NN classify a blob by its geometric features against loaded templates.
+// Returns the gesture label (e.g. "point", "open_palm") or NULL when no
+// templates are loaded (caller falls back to geometric heuristic).
+const char *gesture_knn_classify(float ar, float fill, float cy_norm);
+
+// Number of templates currently loaded into the KNN index.
+int gesture_knn_count(void);
+
+// Delete all gesture template files from SD and clear the in-memory KNN index.
+void training_clear_gesture_templates(void);
 
 #ifdef __cplusplus
 }

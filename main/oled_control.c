@@ -44,7 +44,8 @@ static uint8_t  s_fb[FB_SIZE];         // framebuffer (page-oriented)
 static uint8_t  s_tx_buf[1 + FB_SIZE]; // 0x40 + framebuffer for data TX
 
 #define OLED_FLUSH_MIN_US  50000LL   // max 20 fps on OLED
-static int64_t s_last_flush_us = 0;
+static int64_t s_last_flush_us  = 0;
+static int64_t s_hold_until_us  = 0;  /* suppress eye drawing while a sign is displayed */
 
 // ---------------------------------------------------------------
 // Pixel helpers
@@ -216,6 +217,7 @@ void oled_init(void)
 void oled_draw_eyes(int pupil_dx, int pupil_dy, bool face_seen)
 {
     if (!s_ready) return;
+    if (esp_timer_get_time() < s_hold_until_us) return;  /* held by recording/thinking sign */
 
     fill_fb(1);  // white background
 
@@ -249,6 +251,7 @@ void oled_draw_eyes(int pupil_dx, int pupil_dy, bool face_seen)
 void oled_draw_sleep(void)
 {
     if (!s_ready) return;
+    if (esp_timer_get_time() < s_hold_until_us) return;
 
     fill_fb(1);  // white background
 
@@ -258,5 +261,59 @@ void oled_draw_sleep(void)
     draw_hline(LEFT_EYE_X  - EYE_RADIUS, LEFT_EYE_X  + EYE_RADIUS, EYE_Y + 1, 0);
     draw_hline(RIGHT_EYE_X - EYE_RADIUS, RIGHT_EYE_X + EYE_RADIUS, EYE_Y + 1, 0);
 
+    oled_flush();
+}
+
+void oled_draw_recording(void)
+{
+    if (!s_ready) return;
+    fill_fb(1);  // white background
+
+    // Eye circles (black outline)
+    draw_circle(LEFT_EYE_X,  EYE_Y, EYE_RADIUS, 0);
+    draw_circle(RIGHT_EYE_X, EYE_Y, EYE_RADIUS, 0);
+
+    // Happy squint: fill upper half of pupil circle = UwU excited/listening look
+    for (int dy = -(PUPIL_RADIUS); dy <= 0; ++dy) {
+        int dx = (int)sqrtf((float)(PUPIL_RADIUS * PUPIL_RADIUS - dy * dy));
+        draw_hline(LEFT_EYE_X  - dx, LEFT_EYE_X  + dx, EYE_Y + dy, 0);
+        draw_hline(RIGHT_EYE_X - dx, RIGHT_EYE_X + dx, EYE_Y + dy, 0);
+    }
+
+    // Sound-wave arcs on each side (3 vertical dashes fanning out)
+    for (int i = 1; i <= 3; ++i) {
+        set_pixel(4 + i * 2, EYE_Y - i, 0);
+        set_pixel(4 + i * 2, EYE_Y,     0);
+        set_pixel(4 + i * 2, EYE_Y + i, 0);
+        set_pixel(123 - i * 2, EYE_Y - i, 0);
+        set_pixel(123 - i * 2, EYE_Y,     0);
+        set_pixel(123 - i * 2, EYE_Y + i, 0);
+    }
+
+    // Hold for 2.5 s — suppresses oled_draw_eyes/sleep during recording
+    s_hold_until_us = esp_timer_get_time() + 2500000LL;
+    oled_flush();
+}
+
+void oled_draw_thinking(void)
+{
+    if (!s_ready) return;
+    fill_fb(1);  // white background
+
+    // Eye circles (black outline)
+    draw_circle(LEFT_EYE_X,  EYE_Y, EYE_RADIUS, 0);
+    draw_circle(RIGHT_EYE_X, EYE_Y, EYE_RADIUS, 0);
+
+    // Pupils looking up-left — classic thinking pose
+    fill_circle(LEFT_EYE_X  - 4, EYE_Y - 3, PUPIL_RADIUS, 0);
+    fill_circle(RIGHT_EYE_X - 4, EYE_Y - 3, PUPIL_RADIUS, 0);
+
+    // Three "..." dots at the very bottom of the display
+    fill_circle(54, 29, 2, 0);
+    fill_circle(64, 29, 2, 0);
+    fill_circle(74, 29, 2, 0);
+
+    // Hold for 2.5 s
+    s_hold_until_us = esp_timer_get_time() + 2500000LL;
     oled_flush();
 }

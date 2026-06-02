@@ -13,6 +13,10 @@ typedef struct {
     int y1;
     int x2;
     int y2;
+    int hx1;  /* hand bounding box (all 0 when no hand detected) */
+    int hy1;
+    int hx2;
+    int hy2;
     char side[8];
     char kind[12];
     char gesture[16];

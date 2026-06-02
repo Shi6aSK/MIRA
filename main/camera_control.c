@@ -21,14 +21,15 @@ esp_err_t camera_init(void)
         .pin_vsync = VSYNC_GPIO_NUM,
         .pin_href  = HREF_GPIO_NUM,
         .pin_pclk  = PCLK_GPIO_NUM,
-        .xclk_freq_hz  = 20000000,  /* 20 MHz – 10 MHz was too slow → DMA timeout every 4 s */
+        .xclk_freq_hz  = 20000000,  /* 20 MHz – standard XCLK for OV3660; 16 MHz caused
+                                       sub-optimal PLL lock in RGB565 mode */
         .ledc_timer    = LEDC_TIMER_0,
         .ledc_channel  = LEDC_CHANNEL_0,
         .pixel_format  = PIXFORMAT_RGB565,
-        .frame_size    = FRAMESIZE_240X240,
+        .frame_size    = FRAMESIZE_QVGA,      /* 320x240 – OV3660 native; 240x240 not supported */
         .jpeg_quality  = JPEG_QUALITY,
-        .fb_count      = 1,
-        .grab_mode     = CAMERA_GRAB_WHEN_EMPTY,  /* one DMA at a time – avoids PSRAM deadlock with WiFi */
+        .fb_count      = 3,    /* 3 PSRAM buffers: prevents EV-VSYNC-OVF during long inference cycles */
+        .grab_mode     = CAMERA_GRAB_LATEST,      /* discard stale frames – prevents EV-VSYNC-OVF DMA overflow */
         .fb_location   = CAMERA_FB_IN_PSRAM,
     };
 
@@ -40,36 +41,37 @@ esp_err_t camera_init(void)
 
     sensor_t *s = esp_camera_sensor_get();
     if (s) {
-        s->set_vflip(s, 1);
-        s->set_hmirror(s, 1);
+        /* OV3660 outputs correctly-oriented data on the XIAO ESP32S3 Sense board.
+         * No vflip/hmirror needed; the original CSS rotate(180deg) in the web UI
+         * was erroneously flipping an already-correct image. */
 
         /* Auto-exposure / auto-gain / auto-white-balance */
         s->set_exposure_ctrl(s, 1);   // AEC enable
         s->set_aec2(s, 1);            // AEC DSP enable
-        s->set_ae_level(s, 2);        // +2 exposure bias (maximum – brighter)
-        s->set_aec_value(s, 600);     // seed AEC high so it starts bright
+        s->set_ae_level(s, 2);        // +2 exposure bias for brighter indoor image
+        s->set_aec_value(s, 800);     // higher seed value for dimmer rooms
         s->set_gain_ctrl(s, 1);       // AGC enable
-        s->set_gainceiling(s, (gainceiling_t)2); // max gain 8x - less noise than 32x
-        s->set_agc_gain(s, 0);        // start at min; AEC extends shutter before boosting gain
+        s->set_agc_gain(s, 2);        // lower start gain – less noise
         s->set_whitebal(s, 1);        // AWB enable
         s->set_awb_gain(s, 1);        // AWB gain enable
-        s->set_wb_mode(s, 0);         // AWB mode: auto
+        s->set_wb_mode(s, 0);         // auto WB
 
-        /* Image quality */
-        s->set_brightness(s, 1);      // +1 brightness (not max – avoids overexposure)
-        s->set_contrast(s, 0);        // neutral contrast
-        s->set_saturation(s, 0);      // neutral saturation – less colour noise
-        s->set_sharpness(s, 0);       // no sharpening – avoids edge artefacts
+        /* Image quality – Seeed-official OV3660 values + denoise */
+        s->set_brightness(s, 2);      // +2 for better indoor exposure
+        s->set_contrast(s, 1);        // +1
+        s->set_saturation(s, -2);     // -2 (OV3660 oversaturates)
+        s->set_sharpness(s, 3);       // max (range -3 to +3 per driver source)
+        s->set_denoise(s, 2);         // light denoise (OV3660-specific, range 0-8)
         s->set_special_effect(s, 0);  // no colour effect
-        s->set_bpc(s, 1);             // bad-pixel correction on
-        s->set_wpc(s, 1);             // white-pixel correction on
-        s->set_raw_gma(s, 1);         // raw gamma on
-        s->set_lenc(s, 1);            // lens correction on
-        s->set_dcw(s, 1);             // down-scale+crop enable
-        s->set_colorbar(s, 0);        // no test pattern
+        s->set_bpc(s, 1);             // bad-pixel correction
+        s->set_wpc(s, 1);             // white-pixel correction
+        s->set_raw_gma(s, 1);         // raw gamma
+        s->set_lenc(s, 1);            // lens correction
+        s->set_dcw(s, 1);             // downscale+crop
+        s->set_gainceiling(s, (gainceiling_t)2); // 8x ceiling – lower gain = less noise
+        s->set_colorbar(s, 0);
 
-        /* Let AWB/AEC converge over ~60 frames before vision_task starts */
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(2500));
     }
 
     ESP_LOGW(TAG, "Camera ready %dx%d RGB565", FRAME_WIDTH, FRAME_HEIGHT);
