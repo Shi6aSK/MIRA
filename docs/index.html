@@ -1,738 +1,599 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MIRA — Multimodal Interactive Recognition Assistant</title>
   <style>
-    /* ── Reset & Base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:          #0d0d0d;
-      --bg2:         #141414;
-      --bg3:         #1c1c1c;
-      --border:      #2a2a2a;
-      --accent:      #e85d04;
-      --accent2:     #f48c06;
-      --accent-dim:  rgba(232, 93, 4, 0.15);
-      --text:        #d8d8d8;
-      --text-muted:  #7a7a7a;
-      --heading:     #f0f0f0;
-      --nav-w:       240px;
-      --max-w:       820px;
+      --bg:         #0b0b0d;
+      --bg2:        #101012;
+      --bg3:        #16161a;
+      --border:     #222226;
+      --border2:    #2c2c32;
+      --accent:     #c0511a;
+      --accent2:    #e0723a;
+      --accent-dim: rgba(192, 81, 26, 0.11);
+      --text:       #c4c4c8;
+      --muted:      #65656e;
+      --heading:    #eaeaed;
+      --nav-w:      228px;
+      --col-w:      800px;
+      --mono:       'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+      --sans:       'Inter', 'Segoe UI', system-ui, sans-serif;
     }
 
-    html { scroll-behavior: smooth; font-size: 16px; }
+    html { scroll-behavior: smooth; font-size: 15px; }
 
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-      line-height: 1.7;
+      font-family: var(--sans);
+      line-height: 1.75;
       display: flex;
     }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-    /* ── Side Nav ── */
-    #sidenav {
-      position: fixed;
-      top: 0; left: 0;
-      width: var(--nav-w);
-      height: 100vh;
+    /* ── NAV ── */
+    #nav {
+      position: fixed; top: 0; left: 0;
+      width: var(--nav-w); height: 100vh;
       overflow-y: auto;
-      padding: 2rem 0;
       border-right: 1px solid var(--border);
       background: var(--bg);
       z-index: 100;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
     }
 
-    .nav-logo {
-      padding: 0 1.5rem 1.5rem;
+    .nav-head {
+      padding: 1.5rem 1.4rem 1.3rem;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 1.5rem;
     }
 
-    .nav-logo span.logo-m {
-      display: inline-block;
-      font-size: 1.5rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: var(--accent);
+    .nav-wordmark {
+      font-size: 1.2rem; font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.3rem;
+    }
+    .nav-wordmark .m  { color: var(--accent2); }
+    .nav-wordmark .ira { color: var(--heading); }
+
+    .nav-byline {
+      font-size: 0.6rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em; line-height: 1.5;
     }
 
-    .nav-logo span.logo-ira {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--heading);
+    .nav-links { padding: 0.8rem 0; flex: 1; }
+
+    .nav-grp {
+      padding: 0.9rem 1.4rem 0.2rem;
+      font-size: 0.56rem; text-transform: uppercase;
+      letter-spacing: 0.15em; color: var(--muted); opacity: 0.55;
     }
 
-    .nav-logo p {
-      font-size: 0.65rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    #sidenav a {
+    #nav a {
       display: block;
-      padding: 0.35rem 1.5rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      letter-spacing: 0.04em;
-      transition: color 0.2s, background 0.2s;
+      padding: 0.27rem 1.4rem 0.27rem 1.6rem;
+      font-size: 0.73rem; color: var(--muted);
+      text-decoration: none; letter-spacing: 0.01em;
       border-left: 2px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
     }
+    #nav a:hover  { color: var(--accent2); background: var(--accent-dim); }
+    #nav a.active { color: var(--accent2); border-left-color: var(--accent); background: var(--accent-dim); }
 
-    #sidenav a:hover,
-    #sidenav a.active {
-      color: var(--accent);
-      border-left-color: var(--accent);
-      background: var(--accent-dim);
-    }
-
-    .nav-section-label {
-      padding: 1rem 1.5rem 0.3rem;
-      font-size: 0.6rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      opacity: 0.6;
-    }
-
-    .nav-github {
-      margin-top: auto;
-      padding: 1.5rem;
+    .nav-foot {
+      padding: 1.1rem 1.4rem;
       border-top: 1px solid var(--border);
     }
-
-    .nav-github a {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.2s;
-      padding: 0 !important;
-      border: none !important;
-      background: none !important;
+    .nav-foot a {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.69rem; color: var(--muted);
+      text-decoration: none; transition: color .15s;
+      padding: 0; border: none; background: none;
     }
+    .nav-foot a:hover { color: var(--accent2); background: none !important; }
 
-    .nav-github a:hover { color: var(--accent); }
+    /* ── CONTENT ── */
+    #content { margin-left: var(--nav-w); flex: 1; min-width: 0; }
 
-    /* ── Main Content ── */
-    #content {
-      margin-left: var(--nav-w);
-      flex: 1;
-      padding: 0;
-    }
-
-    /* ── Hero ── */
-    #hero {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4rem 3rem;
+    /* ── COVER ── */
+    #cover {
+      min-height: 100vh; display: flex; align-items: center;
+      padding: 5rem 4rem;
       border-bottom: 1px solid var(--border);
-      background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(232,93,4,0.06) 0%, transparent 70%);
+      background: radial-gradient(ellipse 85% 55% at 44% 42%, rgba(192,81,26,.07) 0%, transparent 68%);
+    }
+    .cover-inner { max-width: var(--col-w); width: 100%; }
+
+    .cover-kicker {
+      font-size: 0.62rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.2em;
+      color: var(--accent2); margin-bottom: 1.5rem;
     }
 
-    .hero-inner {
-      max-width: var(--max-w);
-      width: 100%;
-    }
-
-    .hero-eyebrow {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      color: var(--accent);
-      margin-bottom: 1.2rem;
-      font-weight: 600;
-    }
-
-    .hero-title {
-      font-size: clamp(2.4rem, 5vw, 3.6rem);
-      font-weight: 800;
-      line-height: 1.1;
-      color: var(--heading);
-      letter-spacing: -0.03em;
-      margin-bottom: 1rem;
-    }
-
-    .hero-title em {
-      color: var(--accent);
-      font-style: normal;
-    }
-
-    .hero-subtitle {
-      font-size: 1.05rem;
-      color: var(--text-muted);
-      max-width: 560px;
-      margin-bottom: 2.5rem;
-      line-height: 1.6;
-    }
-
-    .badge-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 2.5rem;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 0.3rem 0.75rem;
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      border-radius: 4px;
-      background: var(--bg3);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-    }
-
-    .badge.accent {
-      background: var(--accent-dim);
-      color: var(--accent2);
-      border-color: rgba(232,93,4,0.3);
-    }
-
-    .hero-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.7rem 1.4rem;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 700;
-      border-radius: 6px;
-      letter-spacing: 0.04em;
-      transition: background 0.2s;
-    }
-
-    .hero-cta:hover { background: var(--accent2); }
-
-    /* ── Sections ── */
-    .section {
-      padding: 5rem 3rem;
-      border-bottom: 1px solid var(--border);
-      max-width: var(--max-w);
-      margin: 0 auto;
-    }
-
-    .section-number {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      color: var(--accent);
-      font-weight: 700;
+    .cover-title {
+      font-size: clamp(2rem, 4.5vw, 3.3rem);
+      font-weight: 800; line-height: 1.07;
+      color: var(--heading); letter-spacing: -0.035em;
       margin-bottom: 0.5rem;
-      opacity: 0.9;
+    }
+    .cover-title .hi { color: var(--accent2); }
+
+    .cover-desc {
+      font-size: 0.95rem; color: var(--muted);
+      max-width: 510px; line-height: 1.6; margin-bottom: 2.5rem; margin-top: 0.6rem;
     }
 
-    .section-title {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: var(--heading);
-      letter-spacing: -0.02em;
-      margin-bottom: 2rem;
-      line-height: 1.2;
+    .cover-meta {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 0.28rem 1.6rem; font-size: 0.77rem;
+      max-width: 500px; margin-bottom: 2.6rem;
+    }
+    .cover-meta .k {
+      color: var(--muted); font-size: 0.64rem;
+      text-transform: uppercase; letter-spacing: 0.08em; padding-top: 0.07rem;
+    }
+    .cover-meta .v { color: var(--text); }
+    .cover-meta .v a { color: var(--accent2); text-decoration: none; }
+
+    .chip-row { display: flex; flex-wrap: wrap; gap: 0.38rem; margin-bottom: 2.2rem; }
+    .chip {
+      padding: 0.22rem 0.66rem; font-size: 0.64rem; font-weight: 600;
+      letter-spacing: 0.04em; border-radius: 3px;
+      background: var(--bg3); color: var(--muted); border: 1px solid var(--border2);
+    }
+    .chip.hi {
+      background: var(--accent-dim); color: var(--accent2);
+      border-color: rgba(192,81,26,.28);
+    }
+
+    .cta {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.6rem 1.25rem; background: var(--accent); color: #fff;
+      text-decoration: none; font-size: 0.78rem; font-weight: 700;
+      border-radius: 5px; letter-spacing: 0.05em; transition: background .2s;
+    }
+    .cta:hover { background: var(--accent2); }
+
+    /* ── SECTIONS ── */
+    .sec { padding: 4.5rem 4rem; border-bottom: 1px solid var(--border); }
+    .sec-inner { max-width: var(--col-w); margin: 0 auto; }
+
+    .sec-num {
+      font-size: 0.58rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.2em;
+      color: var(--accent); margin-bottom: 0.35rem;
+    }
+
+    .sec-title {
+      font-size: 1.6rem; font-weight: 700; color: var(--heading);
+      letter-spacing: -0.025em; margin-bottom: 1.7rem; line-height: 1.18;
     }
 
     h3 {
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: var(--heading);
-      margin: 2rem 0 0.75rem;
+      font-size: 0.72rem; font-weight: 700; color: var(--heading);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--border); padding-bottom: 0.38rem;
+      margin: 2.4rem 0 0.85rem;
     }
 
-    p { margin-bottom: 1rem; }
-
-    /* ── Hardware Image ── */
-    .hw-photo {
-      width: 100%;
-      max-width: 480px;
-      display: block;
-      margin: 2rem auto;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      object-fit: cover;
+    h4 {
+      font-size: 0.82rem; font-weight: 600; color: var(--heading);
+      margin: 1.4rem 0 0.5rem; letter-spacing: 0.01em;
     }
 
-    /* ── Table ── */
-    .tbl-wrap { overflow-x: auto; margin: 1.5rem 0; }
+    p { margin-bottom: 0.9rem; font-size: 0.88rem; }
+    p:last-child { margin-bottom: 0; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
+    ul, ol { margin: 0.7rem 0 0.9rem 1.3rem; font-size: 0.88rem; }
+    li { margin-bottom: 0.3rem; }
+
+    strong { color: var(--heading); font-weight: 600; }
+    em { font-style: italic; }
+    code { font-family: var(--mono); }
+
+    /* ── ABSTRACT ── */
+    .abstract {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0; padding: 1.3rem 1.5rem; margin-bottom: 1.6rem;
+    }
+    .abstract-label {
+      font-size: 0.57rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.18em; color: var(--accent); margin-bottom: 0.55rem;
+    }
+    .abstract p { font-size: 0.87rem; color: var(--text); line-height: 1.7; }
+
+    /* ── BLOCKQUOTE ── */
+    blockquote {
+      border-left: 3px solid var(--accent); margin: 1.4rem 0;
+      padding: 0.75rem 1.25rem; background: var(--accent-dim);
+      border-radius: 0 5px 5px 0; font-size: 0.86rem;
+      color: var(--text); font-style: italic;
     }
 
-    thead tr {
-      background: var(--bg3);
-      border-bottom: 1px solid var(--border);
-    }
-
+    /* ── TABLES ── */
+    .tbl-wrap { overflow-x: auto; margin: 1.3rem 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    thead tr { background: var(--bg3); border-bottom: 2px solid var(--border2); }
     thead th {
-      text-align: left;
-      padding: 0.65rem 1rem;
-      font-weight: 600;
-      color: var(--accent2);
-      text-transform: uppercase;
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
+      text-align: left; padding: 0.58rem 0.9rem; font-weight: 700;
+      color: var(--accent2); text-transform: uppercase;
+      font-size: 0.61rem; letter-spacing: 0.1em;
     }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s;
-    }
-
+    tbody tr { border-bottom: 1px solid var(--border); }
     tbody tr:hover { background: var(--bg3); }
-
-    tbody td {
-      padding: 0.65rem 1rem;
-      color: var(--text);
-      vertical-align: top;
-    }
-
-    tbody td:first-child {
-      color: var(--heading);
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
+    tbody td { padding: 0.55rem 0.9rem; color: var(--text); vertical-align: top; line-height: 1.5; }
+    tbody td:first-child { color: var(--heading); font-weight: 500; }
     td code, th code {
-      font-size: 0.8em;
-      background: var(--bg3);
-      padding: 0.1em 0.4em;
-      border-radius: 3px;
-      color: var(--accent2);
+      font-size: 0.82em; background: var(--bg3);
+      padding: 0.1em 0.38em; border-radius: 3px; color: var(--accent2);
     }
+    .yes { color: var(--accent2); font-weight: 700; }
+    .no  { color: var(--muted); }
 
-    /* ── Code Block ── */
+    /* ── CODE BLOCKS ── */
     pre {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      overflow-x: auto;
-      font-size: 0.82rem;
-      line-height: 1.6;
-      color: #c9d1d9;
-      margin: 1.5rem 0;
-      position: relative;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 1.05rem 1.3rem;
+      overflow-x: auto; font-size: 0.77rem; line-height: 1.65;
+      color: #bfc9d4; margin: 1.3rem 0; position: relative;
+      font-family: var(--mono);
     }
-
     pre::before {
-      content: attr(data-lang);
-      position: absolute;
-      top: 0.5rem;
-      right: 1rem;
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
+      content: attr(data-lang); position: absolute;
+      top: 0.42rem; right: 0.85rem; font-size: 0.56rem;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--muted); font-family: var(--sans);
+    }
+    pre code { background: none; padding: 0; border-radius: 0; color: inherit; }
+    p code, li code {
+      font-size: 0.82em; background: var(--bg3);
+      padding: 0.1em 0.38em; border-radius: 3px; color: var(--accent2);
     }
 
-    code { font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace; }
-
-    /* ── Feature Cards ── */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
+    /* ── FIGURE ── */
+    .fig-wrap { margin: 2rem 0; }
+    .fig-label {
+      font-size: 0.59rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.16em; color: var(--accent); margin-bottom: 0.5rem;
+    }
+    .fig-caption {
+      font-size: 0.71rem; color: var(--muted); margin-top: 0.55rem;
+      text-align: center; font-style: italic;
     }
 
-    .card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.25rem;
-      transition: border-color 0.2s;
+    /* ── DIAGRAMS: CSS flowchart ── */
+    .flow {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 7px; padding: 2rem 1.5rem;
+      font-size: 0.75rem; overflow-x: auto;
     }
 
-    .card:hover { border-color: var(--accent); }
-
-    .card-icon {
-      font-size: 1.5rem;
-      margin-bottom: 0.75rem;
+    .flow-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; margin: 0.15rem 0;
     }
 
-    .card h4 {
+    .flow-col {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0;
+    }
+
+    .fnode {
+      padding: 0.52rem 1.1rem; border-radius: 4px;
+      border: 1px solid var(--border2); background: var(--bg3);
+      color: var(--heading); font-weight: 600; font-size: 0.74rem;
+      text-align: center; white-space: nowrap; min-width: 120px;
+      line-height: 1.35;
+    }
+    .fnode.accent {
+      background: var(--accent-dim); border-color: rgba(192,81,26,.4);
+      color: var(--accent2);
+    }
+    .fnode.diamond {
+      transform: rotate(45deg); border-radius: 3px;
+      padding: 0.6rem; min-width: 80px; min-height: 80px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fnode.diamond span { transform: rotate(-45deg); display: block; text-align: center; font-size: 0.69rem; }
+
+    .farrow {
+      color: var(--muted); font-size: 1.1rem;
+      display: flex; align-items: center; padding: 0 0.3rem;
+      line-height: 1;
+    }
+    .farrow.down {
+      flex-direction: column; padding: 0.1rem 0;
       font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--heading);
-      margin-bottom: 0.4rem;
+    }
+    .farrow-label {
+      font-size: 0.58rem; color: var(--muted);
+      white-space: nowrap; padding: 0 0.25rem;
     }
 
-    .card p {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-      margin: 0;
-    }
+    /* ── STATE MACHINE SVG DIAGRAM ── */
+    .fsm-svg { width: 100%; max-width: 700px; display: block; margin: 0 auto; }
 
-    /* ── Architecture Flow ── */
-    .arch-diagram {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.5rem 2rem;
-      font-size: 0.8rem;
-      font-family: 'Fira Code', monospace;
-      line-height: 1.9;
-      color: #c9d1d9;
-      overflow-x: auto;
-      margin: 1.5rem 0;
-    }
-
-    .arch-diagram .node-main {
-      color: var(--accent2);
-      font-weight: 700;
-    }
-
-    .arch-diagram .node-sub {
-      color: var(--text-muted);
-    }
-
-    /* ── Videos ── */
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-      margin: 1.5rem 0;
-    }
-
-    .video-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: border-color 0.2s;
-    }
-
-    .video-card:hover { border-color: var(--accent); }
-
-    .video-card video {
-      width: 100%;
-      display: block;
-      background: #000;
-      max-height: 300px;
-      object-fit: contain;
-    }
-
-    .video-label {
-      padding: 0.75rem 1rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .video-label span {
-      color: var(--accent);
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      display: block;
-      margin-bottom: 0.2rem;
-    }
-
-    /* ── Label/pill ── */
-    .pill {
-      display: inline-block;
-      padding: 0.2rem 0.6rem;
-      font-size: 0.7rem;
-      font-weight: 600;
-      border-radius: 4px;
-      background: var(--accent-dim);
-      color: var(--accent2);
-      border: 1px solid rgba(232,93,4,0.25);
-      margin: 0.2rem 0.2rem 0.2rem 0;
-    }
-
-    /* ── State machine list ── */
-    .fsm-list {
-      list-style: none;
-      margin: 1.25rem 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-
+    /* ── FSM LIST ── */
+    .fsm-list { list-style: none; margin: 1.2rem 0; }
     .fsm-list li {
-      display: flex;
-      gap: 0.75rem;
-      padding: 0.7rem 1rem;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 0.85rem;
-      align-items: flex-start;
+      display: grid; grid-template-columns: 130px 1fr;
+      gap: 0.9rem; padding: 0.68rem 1rem;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-top: none; font-size: 0.82rem; align-items: start;
+    }
+    .fsm-list li:first-child { border-top: 1px solid var(--border); border-radius: 5px 5px 0 0; }
+    .fsm-list li:last-child  { border-radius: 0 0 5px 5px; }
+    .fsm-list .s-name {
+      font-weight: 700; color: var(--accent2);
+      font-size: 0.66rem; text-transform: uppercase;
+      letter-spacing: 0.07em; line-height: 1.4;
+    }
+    .fsm-list .s-desc { color: var(--muted); font-size: 0.79rem; line-height: 1.5; }
+
+    /* ── SPEC GRID ── */
+    .spec-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1px; background: var(--border); border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden; margin: 1.3rem 0;
+    }
+    .spec-cell { background: var(--bg2); padding: 1rem 1.1rem; }
+    .spec-cell-label {
+      font-size: 0.58rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.13em; color: var(--muted); margin-bottom: 0.3rem;
+    }
+    .spec-cell-value { font-size: 0.8rem; color: var(--heading); font-weight: 500; line-height: 1.4; }
+
+    /* ── PILL TAGS ── */
+    .pill-row { display: flex; flex-wrap: wrap; gap: 0.32rem; margin: 0.9rem 0; }
+    .pill {
+      padding: 0.16rem 0.55rem; font-size: 0.64rem; font-weight: 600;
+      border-radius: 3px; background: var(--accent-dim); color: var(--accent2);
+      border: 1px solid rgba(192,81,26,.24); font-family: var(--mono);
     }
 
-    .fsm-list li .state-name {
-      font-weight: 700;
-      color: var(--accent2);
-      min-width: 120px;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding-top: 0.1rem;
+    /* ── HARDWARE PHOTO ── */
+    .hw-photo {
+      display: block; max-width: 400px; width: 100%;
+      margin: 1.6rem auto; border-radius: 8px;
+      border: 1px solid var(--border); object-fit: cover;
     }
 
-    .fsm-list li .state-desc {
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      line-height: 1.5;
+    /* ── VIDEOS ── */
+    .video-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.1rem; margin: 1.3rem 0;
     }
+    .video-wrap {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 7px; overflow: hidden;
+    }
+    .video-wrap video {
+      width: 100%; display: block; background: #000;
+      max-height: 270px; object-fit: contain;
+    }
+    .video-caption { padding: 0.65rem 0.9rem; }
+    .vc-tag {
+      font-size: 0.56rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--accent); display: block; margin-bottom: 0.18rem;
+    }
+    .vc-title { font-size: 0.76rem; color: var(--muted); }
 
-    /* ── Footer ── */
+    /* ── CALLOUT ── */
+    .callout {
+      border: 1px solid var(--border2); border-radius: 5px;
+      padding: 1.1rem 1.3rem; background: var(--bg3); margin: 1.4rem 0;
+      font-size: 0.84rem;
+    }
+    .callout strong { color: var(--accent2); }
+
+    /* ── FOOTER ── */
     footer {
-      padding: 3rem;
-      border-top: 1px solid var(--border);
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      max-width: var(--max-w);
-      margin: 0 auto;
-      line-height: 1.8;
+      padding: 2.5rem 4rem; text-align: center;
+      font-size: 0.7rem; color: var(--muted); line-height: 1.9;
     }
-
-    footer a { color: var(--accent); text-decoration: none; }
+    footer a { color: var(--accent2); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
-    /* ── Blockquote ── */
-    blockquote {
-      border-left: 3px solid var(--accent);
-      margin: 1.5rem 0;
-      padding: 0.75rem 1.25rem;
-      background: var(--accent-dim);
-      border-radius: 0 6px 6px 0;
-      font-size: 0.9rem;
-      color: var(--text);
-      font-style: italic;
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 900px) {
-      :root { --nav-w: 0px; }
-
-      #sidenav {
-        display: none;
-      }
-
+    /* ── RESPONSIVE ── */
+    @media (max-width: 860px) {
+      #nav { display: none; }
       #content { margin-left: 0; }
-
-      .hero-inner, .section { padding-left: 1.5rem; padding-right: 1.5rem; }
-
+      #cover, .sec { padding-left: 1.5rem; padding-right: 1.5rem; }
+      #cover { padding-top: 3rem; }
+      .fsm-list li, .fsm-list li { grid-template-columns: 1fr; gap: 0.25rem; }
+    }
+    @media (max-width: 560px) {
+      .cover-title { font-size: 1.9rem; }
       .video-grid { grid-template-columns: 1fr; }
+      .spec-grid { grid-template-columns: 1fr 1fr; }
     }
 
-    @media (max-width: 600px) {
-      .hero-title { font-size: 2rem; }
-      .section { padding: 3rem 1.25rem; }
-    }
-
-    /* ── Active section highlight ── */
-    section { scroll-margin-top: 2rem; }
+    section { scroll-margin-top: 1.5rem; }
   </style>
 </head>
 <body>
 
-<!-- ════════════════════════════════ SIDE NAV ════════════════════════════════ -->
-<nav id="sidenav">
-  <div class="nav-logo">
-    <div><span class="logo-m">M</span><span class="logo-ira">IRA</span></div>
-    <p>Multimodal Interactive Recognition Assistant</p>
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-head">
+    <div class="nav-wordmark"><span class="m">M</span><span class="ira">IRA</span></div>
+    <div class="nav-byline">Multimodal Interactive<br>Recognition Assistant</div>
   </div>
-
-  <div class="nav-section-label">Sections</div>
-  <a href="#hero">↑ Top</a>
-  <a href="#overview">01 · Overview</a>
-  <a href="#hardware">02 · Hardware</a>
-  <a href="#architecture">03 · Architecture</a>
-  <a href="#features">04 · Features</a>
-  <a href="#demo">05 · Demo</a>
-  <a href="#build">06 · Build</a>
-  <a href="#code">07 · Code</a>
-
-  <div class="nav-github">
+  <div class="nav-links">
+    <div class="nav-grp">Contents</div>
+    <a href="#cover">Top</a>
+    <a href="#abstract">Abstract</a>
+    <a href="#motivation">01 &middot; Motivation</a>
+    <a href="#hardware">02 &middot; Hardware</a>
+    <a href="#architecture">03 &middot; Architecture</a>
+    <a href="#rationale">04 &middot; Design Rationale</a>
+    <a href="#capabilities">05 &middot; Capabilities</a>
+    <a href="#fault-tolerance">06 &middot; Privacy &amp; Safety</a>
+    <a href="#demo">07 &middot; Demo</a>
+    <a href="#build">08 &middot; Build &amp; Flash</a>
+    <a href="#code">09 &middot; Code</a>
+    <a href="#comparison">10 &middot; Comparison</a>
+  </div>
+  <div class="nav-foot">
     <a href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-      </svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
       github.com/Shi6aSK/MIRA
     </a>
   </div>
 </nav>
 
-<!-- ════════════════════════════════ CONTENT ════════════════════════════════ -->
+<!-- CONTENT -->
 <div id="content">
 
-  <!-- HERO -->
-  <section id="hero">
-    <div class="hero-inner">
-      <p class="hero-eyebrow">ESP32-S3 · FreeRTOS · ESP-DL · Python · Local LLM</p>
-      <h1 class="hero-title">
-        <em>MIRA</em><br>Multimodal Interactive<br>Recognition Assistant
-      </h1>
-      <p class="hero-subtitle">
-        A privacy-preserving, gesture-activated HCI system for blind and visually impaired users —
-        running face detection and gesture recognition on-device, with a local Gemma 4 2B LLM for natural language interaction.
-      </p>
-      <div class="badge-row">
-        <span class="badge accent">Seeed XIAO ESP32-S3 Sense</span>
-        <span class="badge accent">OV2640 Camera</span>
-        <span class="badge accent">ESP-DL INT8 Inference</span>
-        <span class="badge">Pan-Tilt Servo Tracking</span>
-        <span class="badge">OLED Eyes</span>
-        <span class="badge">Groq API / Gemma 4 2B</span>
-        <span class="badge">FreeRTOS</span>
-        <span class="badge">I2S Microphone</span>
-      </div>
-      <a class="hero-cta" href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-        </svg>
-        View on GitHub
-      </a>
+<!-- COVER -->
+<section id="cover">
+  <div class="cover-inner">
+    <p class="cover-kicker">CPRE 5750 / HCI 575 &middot; Computational Perception &middot; Iowa State University &middot; Spring 2026</p>
+    <h1 class="cover-title"><span class="hi">MIRA</span><br>Multimodal Interactive<br>Recognition Assistant</h1>
+    <p class="cover-desc">A privacy-preserving, gesture-activated HCI system for blind and visually impaired users &mdash; running face detection and gesture recognition fully on-device, with a local LLM for natural language interaction.</p>
+    <div class="cover-meta">
+      <span class="k">Author</span>     <span class="v">Shobhit Singh</span>
+      <span class="k">Platform</span>   <span class="v">Seeed XIAO ESP32-S3 Sense + Python companion</span>
+      <span class="k">Stack</span>      <span class="v">ESP-IDF &middot; FreeRTOS &middot; ESP-DL &middot; C/C++ &middot; Python &middot; Groq SDK</span>
+      <span class="k">LLM</span>        <span class="v">Groq API (<code>llama-4-scout-17b</code>, ~1&ndash;3 s) &middot; local Gemma 4 2B</span>
+      <span class="k">Repository</span> <span class="v"><a href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">github.com/Shi6aSK/MIRA</a></span>
     </div>
-  </section>
-
-  <!-- 01 OVERVIEW -->
-  <section id="overview">
-    <div class="section">
-      <p class="section-number">01 · Overview</p>
-      <h2 class="section-title">What is MIRA?</h2>
-
-      <p>
-        MIRA is a physical robotic assistant built on the <strong>Seeed XIAO ESP32-S3 Sense</strong> microcontroller —
-        a dual-core Xtensa LX7 system with a built-in OV2640 camera and I2S microphone. The robot features
-        an orange 3D-printed head, an SSD1306 OLED display showing animated "eyes," a pan-tilt servo assembly for
-        face tracking, and a Python backend running a local large language model.
-      </p>
-
-      <p>
-        Designed from the ground up to serve <strong>blind and visually impaired (BVI) users</strong>, MIRA rejects the
-        always-on microphone model of commercial assistants. Instead, every interaction is intentionally initiated
-        through an explicit gesture, preserving user autonomy and privacy.
-      </p>
-
-      <blockquote>
-        "Privacy is not secrecy — it is the capacity for self-determination over one's own information."
-        — Alan Westin, <em>Privacy and Freedom</em> (1967)
-      </blockquote>
-
-      <h3>Design Principles</h3>
-      <div class="card-grid">
-        <div class="card">
-          <div class="card-icon">🤚</div>
-          <h4>Gesture-Gated Activation</h4>
-          <p>Camera and microphone only activate on explicit user gesture. No wake words, no always-on capture.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🔒</div>
-          <h4>Edge-First Privacy</h4>
-          <p>All vision inference runs on-device. LLM runs locally via Gemma 4 2B — zero cloud telemetry by default.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">👁️</div>
-          <h4>Zero-Screen Interface</h4>
-          <p>OLED status display only. Designed for users who cannot interact with touchscreens.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🎯</div>
-          <h4>Predictable Behavior</h4>
-          <p>Deterministic state machine: face detected → 2-second gate → gesture → action. No surprises.</p>
-        </div>
-      </div>
-
-      <img class="hw-photo" src="media/MIRA_withmmWaveSensor_at_bottom.jpeg" alt="MIRA robot — orange 3D-printed head with OLED eyes display, OV2640 camera, and servo assembly" />
+    <div class="chip-row">
+      <span class="chip hi">ESP32-S3 Sense</span>
+      <span class="chip hi">OV2640 Camera</span>
+      <span class="chip hi">ESP-DL INT8 Inference</span>
+      <span class="chip">FreeRTOS</span>
+      <span class="chip">I2S Microphone</span>
+      <span class="chip">SSD1306 OLED</span>
+      <span class="chip">Pan-Tilt Servos</span>
+      <span class="chip">Kalman Tracking</span>
+      <span class="chip">Groq / Gemma 4 2B</span>
     </div>
-  </section>
+    <a class="cta" href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+</section>
 
-  <!-- 02 HARDWARE -->
-  <section id="hardware">
-    <div class="section">
-      <p class="section-number">02 · Hardware</p>
-      <h2 class="section-title">Platform & Components</h2>
+<!-- ABSTRACT -->
+<section id="abstract">
+  <div class="sec">
+    <div class="sec-inner">
+      <div class="abstract">
+        <div class="abstract-label">Abstract</div>
+        <p>MIRA is a physical robotic assistant built on the Seeed XIAO ESP32-S3 Sense that enables gesture-gated, voice-mediated interaction for blind and visually impaired (BVI) users without requiring a touchscreen or always-on microphone. Face detection and gesture classification run entirely on-device using Espressif&rsquo;s ESP-DL INT8-quantized inference library at 5&ndash;10 fps. A pan-tilt servo assembly tracks the detected face using a Kalman-filtered controller. Audio capture and LLM interaction are unlocked only after an explicit open-palm gesture is observed for at least 2 seconds of face presence, eliminating ambient capture. Natural language responses are generated by a local Gemma 4 2B model or via Groq&rsquo;s cloud API, then delivered through text-to-speech. Every design decision is grounded in Self-Determination Theory and treats privacy as a psychological safety requirement rather than a compliance checkbox.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-      <p>
-        The system is split between an embedded firmware layer running on the ESP32-S3 and a
-        Python companion application on a laptop that hosts the LLM backend.
-      </p>
+<!-- 01 MOTIVATION -->
+<section id="motivation">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">01 &middot; Motivation</p>
+      <h2 class="sec-title">Why existing assistants fail BVI users</h2>
 
-      <h3>Component Table</h3>
+      <p>Commercial voice assistants were designed around a sighted-user mental model: screens for confirmation, wake words for activation, and continuous cloud upload for processing. This creates three structural failure modes that disproportionately affect blind and visually impaired users.</p>
+
+      <h3>Failure modes</h3>
       <div class="tbl-wrap">
         <table>
           <thead>
-            <tr>
-              <th>Component</th>
-              <th>Part</th>
-              <th>Notes</th>
-            </tr>
+            <tr><th>Failure Mode</th><th>Mechanism</th><th>Impact on BVI User</th></tr>
           </thead>
           <tbody>
-            <tr>
-              <td>MCU</td>
-              <td>Seeed XIAO ESP32-S3 Sense</td>
-              <td>Dual-core Xtensa LX7 @ 240 MHz · 512 KB SRAM · 8 MB PSRAM · 8 MB flash</td>
-            </tr>
-            <tr>
-              <td>Camera</td>
-              <td>OmniVision OV2640</td>
-              <td>Built-in · DVP 8-bit · 240×240 RGB565 · ~10 fps with inference</td>
-            </tr>
-            <tr>
-              <td>Display</td>
-              <td>SSD1306 OLED (I2C)</td>
-              <td>Animated "eyes" bitmap · status feedback · 128×64 px</td>
-            </tr>
-            <tr>
-              <td>Audio</td>
-              <td>PDM MEMS Microphone (I2S)</td>
-              <td>Built-in · async DMA capture · triggered by <code>open_palm</code> gesture</td>
-            </tr>
-            <tr>
-              <td>Actuation</td>
-              <td>2× Servo (PWM/LEDC)</td>
-              <td>Pan (<code>GPIO 2</code>) · Tilt (<code>GPIO 3</code>) · Kalman-filtered tracking</td>
-            </tr>
-            <tr>
-              <td>LLM Backend</td>
-              <td>Gemma 4 2B (local) / Groq API</td>
-              <td>Runs on laptop · ~1–3 s latency via Groq · full offline via local model</td>
-            </tr>
-            <tr>
-              <td>Storage</td>
-              <td>MicroSD (SPI)</td>
-              <td>Optional · for snapshot dataset collection</td>
-            </tr>
+            <tr><td>Always-on capture</td><td>Microphone active before any user action</td><td>User cannot visually verify recording state; no tactile indicator</td></tr>
+            <tr><td>Cloud egress</td><td>Audio and frames uploaded to remote servers</td><td>User cannot read on-screen upload indicators; data leaves device silently</td></tr>
+            <tr><td>Screen dependency</td><td>Confirmation dialogs and errors shown on display</td><td>Permission prompts, error messages, and state indicators are inaccessible</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>ESP32 GPIO Mapping</h3>
+      <blockquote>"Privacy is not secrecy &mdash; it is the capacity for self-determination over one&rsquo;s own information." &mdash; Alan Westin, <em>Privacy and Freedom</em> (1967)</blockquote>
+
+      <h3>Problem statement</h3>
+      <p><strong>Core thesis:</strong> Vision processing local to the device, gesture-gated audio capture, and a local LLM eliminate the three principal failure modes of commercial assistants for BVI users: always-on capture, cloud egress, and screen dependency.</p>
+
+      <h3>Comparative framing</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>GPIO</th><th>Function</th><th>Interface</th></tr>
-          </thead>
+          <thead><tr><th>Dimension</th><th>Commercial Assistants</th><th>MIRA</th></tr></thead>
+          <tbody>
+            <tr><td>Activation</td><td>Always-on microphone / wake word</td><td>Explicit open-palm gesture after 2-second face gate</td></tr>
+            <tr><td>Inference</td><td>Cloud (Amazon, Google, Apple)</td><td>On-device ESP-DL + local Gemma 4 2B</td></tr>
+            <tr><td>Screen</td><td>Mandatory touchscreen</td><td>Zero-screen; OLED status only</td></tr>
+            <tr><td>Data egress</td><td>Continuous audio/video stream</td><td>Selected short clips sent only on user gesture</td></tr>
+            <tr><td>Privacy model</td><td>Continuous cloud telemetry</td><td>Nothing transmitted without explicit gesture gate</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- FIGURE 1: Problem space flow -->
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 1 &mdash; Problem Scope</div>
+        <pre data-lang="problem scope">
+                 BVI User
+                    |
+        +-----------+-----------+
+        |                       |
+  Commercial Path           MIRA Path
+        |                       |
+ Always-on mic            Explicit gesture
+ Cloud inference          On-device inference
+ Screen confirmation       OLED + TTS feedback
+ Continuous egress         Zero ambient capture
+        |                       |
+  Privacy risk             Privacy preserved
+  Screen barrier           Accessible interface</pre>
+        <p class="fig-caption">Figure 1 &mdash; Divergence between commercial assistant design assumptions and BVI user requirements.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 HARDWARE -->
+<section id="hardware">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">02 &middot; Hardware</p>
+      <h2 class="sec-title">Platform &amp; Components</h2>
+
+      <p>MIRA runs on the Seeed XIAO ESP32-S3 Sense &mdash; a thumb-sized board with built-in OV2640 camera and PDM microphone &mdash; paired with a pan-tilt servo head, an SSD1306 OLED display, and an optional MicroSD card. A connected laptop runs the LLM and TTS backend.</p>
+
+      <img class="hw-photo"
+           src="media/MIRA_withmmWaveSensor_at_bottom.jpeg"
+           alt="MIRA hardware assembly: orange 3D-printed head with OLED display, OV2640 camera, pan-tilt servo structure, and ESP32-S3 board" />
+      <p class="fig-caption">Figure 2 &mdash; MIRA hardware assembly. Orange 3D-printed head, SSD1306 OLED eyes, OV2640 camera module, pan-tilt servo structure, and the XIAO ESP32-S3 Sense board mounted at the base.</p>
+
+      <h3>Component specification</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Part</th><th>Specification</th></tr></thead>
+          <tbody>
+            <tr><td>MCU</td><td>Seeed XIAO ESP32-S3 Sense</td><td>Dual-core Xtensa LX7 @ 240 MHz &middot; 512 KB SRAM &middot; 8 MB PSRAM &middot; 8 MB flash</td></tr>
+            <tr><td>Camera</td><td>OmniVision OV2640</td><td>Built-in DVP 8-bit &middot; 240&times;240 RGB565 &middot; ~10 fps with inference active</td></tr>
+            <tr><td>Display</td><td>SSD1306 OLED (I2C)</td><td>128&times;64 px &middot; animated eye bitmaps &middot; system status feedback</td></tr>
+            <tr><td>Audio</td><td>PDM MEMS Microphone (I2S)</td><td>Built-in &middot; async DMA capture &middot; activated by <code>open_palm</code> gesture only</td></tr>
+            <tr><td>Actuation</td><td>2&times; Servo (PWM/LEDC)</td><td>Pan GPIO 2 &middot; Tilt GPIO 3 &middot; Kalman-filtered face-tracking controller</td></tr>
+            <tr><td>LLM backend</td><td>Gemma 4 2B / Groq API</td><td>Local CPU inference (offline) or <code>llama-4-scout-17b</code> via Groq (~1&ndash;3 s)</td></tr>
+            <tr><td>Storage</td><td>MicroSD (SPI)</td><td>Optional &middot; snapshot dataset collection &middot; gesture template persistence</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>GPIO mapping</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>GPIO</th><th>Function</th><th>Interface</th></tr></thead>
           <tbody>
             <tr><td><code>GPIO 2</code></td><td>Servo Pan</td><td>LEDC PWM</td></tr>
             <tr><td><code>GPIO 3</code></td><td>Servo Tilt</td><td>LEDC PWM</td></tr>
@@ -742,214 +603,490 @@
           </tbody>
         </table>
       </div>
+
+      <h3>Compute constraint</h3>
+      <div class="callout">
+        <strong>No hardware accelerator.</strong> The ESP32-S3 has no GPU or neural-network accelerator. All inference runs on the LX7 cores using INT8-quantized models via ESP-DL. Per-frame inference costs 100&ndash;200 ms, which directly motivates the gesture-gated, Kalman-smoothed design &mdash; inference runs only when the system is in an active state, not continuously.
+      </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 03 ARCHITECTURE -->
-  <section id="architecture">
-    <div class="section">
-      <p class="section-number">03 · Architecture</p>
-      <h2 class="section-title">System Design</h2>
+<!-- 03 ARCHITECTURE -->
+<section id="architecture">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">03 &middot; Architecture</p>
+      <h2 class="sec-title">System Architecture</h2>
 
-      <p>
-        MIRA is organized as two cooperating layers: an <strong>embedded firmware</strong> running on the ESP32-S3 under
-        FreeRTOS, and a <strong>Python companion</strong> on a connected laptop that handles LLM inference, TTS, and
-        audio processing.
-      </p>
+      <p>MIRA is organized as two cooperating layers. The <strong>embedded firmware</strong> runs on the ESP32-S3 under FreeRTOS and handles all real-time sensing, inference, actuation, and HTTP serving. The <strong>Python companion</strong> on a connected laptop handles LLM inference, TTS synthesis, and audio post-processing.</p>
 
-      <pre data-lang="ASCII">
-ESP32-S3 (XIAO Sense)                    Laptop
-┌──────────────────────────┐             ┌────────────────────────────────┐
-│  OV2640 camera           │  USB-JTAG   │  assistant.py  (headless)      │
-│  240×240 RGB565          │ ─────────►  │    or                          │
-│  Face + gesture detect   │  RAW_GRAY   │  serial_viewer.py  (GUI)       │
-│  Servo pan-tilt tracking │  DETECT JSON│                                │
-│  OLED "eyes" display     │ ◄────────── │  → Gemma 4 2B (local CPU)      │
-│  I2S mic capture         │  CMD text   │  → Groq API (llama-4-scout)    │
-│  HTTP web dashboard      │             │  → pyttsx3 TTS (optional)      │
-└──────────────────────────┘             └────────────────────────────────┘</pre>
+      <!-- FIGURE 3: System block diagram -->
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 3 &mdash; End-to-End System Data Flow</div>
+        <pre data-lang="block diagram">
+ESP32-S3 (XIAO Sense)                           Laptop
++------------------------------------------+    +-------------------------------+
+|                                          |    |                               |
+|  OV2640 RGB565 240x240                   |    |  assistant.py  (headless)     |
+|      |                                   |    |    or                         |
+|      v                                   |    |  serial_viewer.py  (GUI)      |
+|  PSRAM frame buffer (115 KB)             |    |                               |
+|      |                                   |    |  +--------------------------+ |
+|      +---> ESP-DL HumanFaceDetect        |    |  | Gemma 4 2B  (local CPU) | |
+|      |       MSR + MNP INT8              |    |  | Groq API  (cloud)       | |
+|      |                                   |    |  | pyttsx3 TTS             | |
+|      +---> Skin-blob BFS (YCbCr)         |    |  +--------------------------+ |
+|      |       Gesture classifier          |    |                               |
+|      |                                   |    +-------------------------------+
+|      +---> Pan-tilt servo (LEDC PWM)           ^                |
+|      |       Kalman filter                      |   USB-JTAG     |
+|      |                                     RAW_GRAY  DETECT JSON |  CMD text
+|      +---> SSD1306 OLED eyes               <---------+          v
+|      |                                     ----------> HTTP /cmd
+|      +---> /detect /stream HTTP            |
+|      |                                     |
+|  I2S DMA Microphone                        |
+|      (active only on open_palm gesture)    |
+|                                            |
++------------------------------------------+</pre>
+        <p class="fig-caption">Figure 3 &mdash; Full system data flow. The ESP32-S3 handles sensing, inference, and actuation. The laptop handles LLM and TTS. Communication is bidirectional over USB-JTAG and HTTP.</p>
+      </div>
 
-      <h3>FreeRTOS Tasks (ESP32-S3)</h3>
+      <h3>FreeRTOS task model</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>Task</th><th>Core</th><th>Responsibility</th></tr>
-          </thead>
+          <thead><tr><th>Task</th><th>Core</th><th>Priority</th><th>Responsibility</th></tr></thead>
           <tbody>
-            <tr><td><code>camera_task</code></td><td>Core 1</td><td>Frame capture, format conversion, push to vision queue</td></tr>
-            <tr><td><code>vision_task</code></td><td>Core 1</td><td>ESP-DL INT8 inference, face + gesture detection, servo update</td></tr>
-            <tr><td><code>uart_console_task</code></td><td>Core 0</td><td>Command parsing from USB-JTAG console</td></tr>
-            <tr><td><code>web_server_task</code></td><td>Core 0</td><td>HTTP dashboard, JPEG stream, /detect, /status endpoints</td></tr>
-            <tr><td><code>oled_task</code></td><td>Core 0</td><td>Animated eye rendering, state display</td></tr>
+            <tr><td><code>camera_task</code></td><td>Core 1</td><td>High</td><td>Frame capture, format conversion, push to vision queue</td></tr>
+            <tr><td><code>vision_task</code></td><td>Core 1</td><td>High</td><td>ESP-DL INT8 face/gesture inference, servo update trigger</td></tr>
+            <tr><td><code>uart_console_task</code></td><td>Core 0</td><td>Medium</td><td>USB-JTAG command parsing, raw frame streaming</td></tr>
+            <tr><td><code>web_server_task</code></td><td>Core 0</td><td>Low</td><td>HTTP dashboard, MJPEG stream, <code>/detect</code>, <code>/status</code></td></tr>
+            <tr><td><code>oled_task</code></td><td>Core 0</td><td>Low</td><td>Animated eye bitmap rendering, system state display</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Interaction State Machine</h3>
+      <!-- FIGURE 4: Interaction state machine -->
+      <h3>Interaction state machine</h3>
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 4 &mdash; Activation State Machine</div>
+        <pre data-lang="state machine">
+         +-------------------+
+         |       IDLE        |  Camera DMA off. Servo resting.
+         |   low-power wait  |  OLED: resting eye state.
+         +-------------------+
+                  |
+          face_detected
+                  |
+                  v
+         +-------------------+
+         |  FACE_DETECTED    |  Camera active. Servo tracking.
+         |  2-s gate starts  |  OLED eyes follow face position.
+         +-------------------+
+                  |
+          gate_elapsed (2 s)
+                  |
+                  v
+         +-------------------+
+         |  GESTURE_GATE     |  Monitoring gesture within face ROI.
+         |  awaiting signal  |  No audio or action until signal.
+         +-------------------+
+           |         |         |
+     open_palm      point   closed_fist
+           |         |         |
+           v         v         v
+     +---------+ +--------+ +----------+
+     |  VOICE  | | VISION | | CANCEL   |
+     | mic DMA | | frame  | | -> FACE  |
+     | -> LLM  | | -> LLM | | _DETECTED|
+     | -> TTS  | | -> TTS | +----------+
+     +---------+ +--------+
+           |         |
+    response complete
+           |         |
+           +----+----+
+                |
+                v
+         +-------------------+
+         |  FACE_DETECTED    |  Return to tracking state.
+         +-------------------+</pre>
+        <p class="fig-caption">Figure 4 &mdash; Six-state interaction FSM. Privacy-sensitive resources (microphone DMA, LLM API) are only accessible from the VOICE or VISION states, which require traversal through the 2-second face-presence gate.</p>
+      </div>
+
+      <h3>State definitions</h3>
       <ul class="fsm-list">
-        <li>
-          <span class="state-name">Idle</span>
-          <span class="state-desc">Camera off. Waiting for user presence. Minimal power consumption. OLED shows sleeping eyes.</span>
-        </li>
-        <li>
-          <span class="state-name">Face Detected</span>
-          <span class="state-desc">Camera active, face locked in frame. 2-second gate starts. Servo begins pan-tilt tracking. OLED eyes track face position.</span>
-        </li>
-        <li>
-          <span class="state-name">Gesture Gate</span>
-          <span class="state-desc">Watching for gesture within the face bounding box. No action until explicit signal.</span>
-        </li>
-        <li>
-          <span class="state-name">Open Palm</span>
-          <span class="state-desc">Microphone activates for 3–5 s audio capture. Audio sent to LLM for Q&A response via TTS.</span>
-        </li>
-        <li>
-          <span class="state-name">Point</span>
-          <span class="state-desc">Frame snapshot captured. Sent to LLM with prompt "What is the object being pointed at?"</span>
-        </li>
-        <li>
-          <span class="state-name">Closed Fist</span>
-          <span class="state-desc">Stop current recording or action. Return to face-detected state.</span>
-        </li>
+        <li><span class="s-name">Idle</span><span class="s-desc">Camera DMA disabled. Servo at rest. System monitors for face entry. Minimum power draw. OLED shows resting state.</span></li>
+        <li><span class="s-name">Face Detected</span><span class="s-desc">Camera active. Face bounding box locked. 2-second presence gate begins. Servo tracks face via Kalman-filtered pan-tilt. OLED eyes follow face.</span></li>
+        <li><span class="s-name">Gesture Gate</span><span class="s-desc">System observes gesture within face ROI. No audio capture, no LLM call, no network traffic until explicit gesture signal is received.</span></li>
+        <li><span class="s-name">Voice (Open Palm)</span><span class="s-desc">Microphone DMA activates. 3&ndash;5 s audio clip captured. Forwarded to LLM (Groq or local Gemma). Response delivered via pyttsx3 or Groq Orpheus TTS.</span></li>
+        <li><span class="s-name">Vision (Point)</span><span class="s-desc">Current PSRAM frame snapshot captured. Sent to LLM with prompt: &ldquo;What is the object being pointed at?&rdquo; Response delivered via TTS.</span></li>
+        <li><span class="s-name">Cancel (Closed Fist)</span><span class="s-desc">Stop active recording or pending LLM call. Transition back to Face Detected. Microphone DMA disabled immediately.</span></li>
       </ul>
 
-      <h3>Detection JSON Output</h3>
+      <h3>Detection JSON schema</h3>
       <pre data-lang="JSON">{
   "frame_id": 42,
-  "obj": 1,
-  "kind": "face",          // "face" | "none"
-  "side": "center",        // "left" | "center" | "right"
-  "bbox": [x1, y1, x2, y2],
-  "gesture": "open_palm",  // "open_palm" | "point" | "hand" | "none"
-  "iou": 0.85
+  "obj":       1,
+  "kind":      "face",        // "face" | "none"
+  "side":      "center",      // "left" | "center" | "right"
+  "bbox":      [x1, y1, x2, y2],
+  "gesture":   "open_palm",   // "open_palm" | "point" | "hand" | "none"
+  "iou":       0.85
 }</pre>
-    </div>
-  </section>
 
-  <!-- 04 FEATURES -->
-  <section id="features">
-    <div class="section">
-      <p class="section-number">04 · Features</p>
-      <h2 class="section-title">Capabilities</h2>
-
-      <h3>On-Device Vision (ESP-DL)</h3>
-      <p>
-        All vision inference runs directly on the ESP32-S3's LX7 cores using
-        Espressif's <strong>ESP-DL</strong> library with INT8-quantized models.
-        Per-frame inference runs in 100–200 ms, enabling ~5–10 fps detection in real time.
-      </p>
-      <div class="badge-row">
-        <span class="pill">Face detection (HumanFaceDetect)</span>
-        <span class="pill">Gesture classification</span>
-        <span class="pill">Template-based matching (IoU)</span>
-        <span class="pill">Kalman-filtered servo tracking</span>
+      <!-- FIGURE 5: Vision pipeline -->
+      <h3>Vision pipeline</h3>
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 5 &mdash; On-Device Vision Pipeline</div>
+        <pre data-lang="pipeline">
+OV2640 DVP capture
+        |
+        v
+ PSRAM frame buffer   240x240 RGB565  (~115 KB)
+        |
+        +-----> JPEG encode -------> /stream HTTP (MJPEG)
+        |
+        v
+ ESP-DL HumanFaceDetect (INT8)
+   MSR model: candidate detection
+   MNP model: landmark regression
+        |
+        +-- no face --> back to idle
+        |
+        v
+ Face ROI extracted (bbox)
+        |
+        +-----> Servo controller
+        |        Kalman filter (pan/tilt)
+        |        LEDC PWM update
+        |
+        +-----> OLED eye renderer
+        |        eye position = face center
+        |
+        v
+ Skin-blob BFS within ROI (YCbCr color space)
+        |
+        v
+ Gesture classifier
+   Template IoU matching against stored templates
+        |
+        v
+ Detection JSON --> /detect endpoint + USB-JTAG stream</pre>
+        <p class="fig-caption">Figure 5 &mdash; Full on-device vision pipeline from frame capture to detection output. All processing runs on ESP32-S3 LX7 cores with no external compute.</p>
       </div>
+    </div>
+  </div>
+</section>
 
-      <h3>Gesture Vocabulary</h3>
+<!-- 04 DESIGN RATIONALE -->
+<section id="rationale">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">04 &middot; Design Rationale</p>
+      <h2 class="sec-title">Human-Centered Design Justification</h2>
+
+      <p>Each hardware and software decision in MIRA is grounded in a documented human psychological need from Self-Determination Theory (Deci &amp; Ryan, 1985), which identifies three universal intrinsic needs: autonomy, competence, and relatedness. These needs are particularly salient for users with visual impairment, where technology often imposes dependency rather than enabling self-determination.</p>
+
+      <h3>Self-Determination Theory mapping</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>Gesture</th><th>Action</th></tr>
-          </thead>
+          <thead><tr><th>SDT Need</th><th>Definition</th><th>MIRA Design Decision</th></tr></thead>
           <tbody>
-            <tr><td><strong>Open Palm</strong> 🤚</td><td>Start voice recording → LLM Q&A with TTS response</td></tr>
-            <tr><td><strong>Point</strong> ☝️</td><td>Capture frame → ask LLM "what is the object being pointed at?"</td></tr>
-            <tr><td><strong>Closed Fist</strong> ✊</td><td>Stop recording or cancel current action</td></tr>
+            <tr>
+              <td>Autonomy</td>
+              <td>Acting as the author of one&rsquo;s own behavior, initiating actions from self-chosen values</td>
+              <td>Gesture-driven activation. The user chooses when the system listens. No wake word, no button, no sighted assistant required. The user sets the pace.</td>
+            </tr>
+            <tr>
+              <td>Competence</td>
+              <td>Feeling effective and capable in interactions with the environment</td>
+              <td>Consistent, predictable gesture vocabulary. Template IoU training adapts to the user&rsquo;s specific gestures, not a factory model. Deterministic behavior builds trust.</td>
+            </tr>
+            <tr>
+              <td>Relatedness</td>
+              <td>Feeling connected and able to participate in shared social and informational environments</td>
+              <td>Object identification via point gesture restores access to ambient information: &ldquo;What is on this shelf?&rdquo;, &ldquo;What does this sign say?&rdquo; &mdash; normalizing participation.</td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <h3>LLM Backend</h3>
-      <p>
-        The Python companion supports two backends, selectable at runtime:
-      </p>
-      <div class="card-grid">
-        <div class="card">
-          <div class="card-icon">⚡</div>
-          <h4>Groq API</h4>
-          <p>Uses <code>llama-4-scout-17b</code>. ~1–3 s end-to-end latency. Requires internet and API key.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🏠</div>
-          <h4>Local Gemma 4 2B</h4>
-          <p>Runs entirely offline on the laptop CPU. Fully private, zero data egress. Slower (~10–30 s).</p>
-        </div>
+      <h3>Privacy threat model for BVI users</h3>
+      <p>Blind users are disproportionately exposed to surveillance risk because they cannot visually verify camera or microphone state, cannot read on-screen recording indicators, and rely on voice interfaces that are inherently always-on by design. MIRA treats privacy as a <strong>psychological safety requirement</strong>.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Threat</th><th>Psychological Impact</th><th>MIRA Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>Always-on camera</td><td>Constant vulnerability, loss of bodily autonomy</td><td>Camera DMA only active when <code>camera_is_enabled()</code> returns true; explicitly toggled by state machine</td></tr>
+            <tr><td>Passive audio capture</td><td>Anxiety, chilling effect on speech</td><td>Microphone DMA starts only on <code>open_palm</code> after 2-second face gate; stops on <code>closed_fist</code> or timeout</td></tr>
+            <tr><td>Cloud data harvesting</td><td>Loss of informational self-determination</td><td>Gemma 4 2B runs entirely locally; Groq used only when user selects cloud mode; zero default egress</td></tr>
+            <tr><td>Unpredictable activation</td><td>Learned helplessness, erosion of trust</td><td>Deterministic FSM: gate &rarr; gesture &rarr; action; OLED feedback at each transition</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <h3>Web Dashboard</h3>
-      <p>
-        The ESP32 serves a live dashboard at its IP on port 80 after Wi-Fi connects.
-        Accessible from any browser on the local network.
-      </p>
-      <div class="badge-row">
-        <span class="pill">Live JPEG camera stream (<code>/stream</code>)</span>
-        <span class="pill">Detection state (<code>/detect</code>)</span>
-        <span class="pill">Camera on/off controls</span>
-        <span class="pill">Servo pan/tilt controls</span>
-        <span class="pill">Gesture training UI</span>
-        <span class="pill">Snapshot capture (<code>/snapshot</code>)</span>
-      </div>
-
-      <h3>Gesture Training</h3>
-      <p>
-        MIRA learns <em>your</em> specific gesture shapes via a template IoU training workflow — no factory model,
-        no recompilation. Add custom templates over HTTP or the UART console.
-      </p>
-      <pre data-lang="HTTP">POST /cmd?op=gesture_train_start
-POST /cmd?op=gesture_label&value=open_palm
-POST /cmd?op=mark          ← stores current frame as template
-POST /cmd?op=gesture_train_stop</pre>
+      <h3>Intentional friction &mdash; the 2-second gate</h3>
+      <p>The 2-second face-presence requirement before accepting any gesture is a deliberate application of Human Factors friction design (Norman, <em>The Design of Everyday Things</em>, 1988):</p>
+      <ul>
+        <li><strong>Reduces false triggers</strong> that erode trust in the competence dimension of SDT</li>
+        <li><strong>Gives the user time to compose intent</strong> before the system acts (autonomy)</li>
+        <li><strong>Creates a perceptible feedback loop:</strong> face detected &rarr; gate timer &rarr; gesture &rarr; response</li>
+        <li>Mirrors the natural human signal of readiness in conversation: eye contact, pause, then speech</li>
+        <li>Satisfies <strong>Norman&rsquo;s Feedback Principle</strong> for users who cannot interpret a display</li>
+      </ul>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 05 DEMO -->
-  <section id="demo">
-    <div class="section">
-      <p class="section-number">05 · Demo</p>
-      <h2 class="section-title">MIRA in Action</h2>
+<!-- 05 CAPABILITIES -->
+<section id="capabilities">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">05 &middot; Capabilities</p>
+      <h2 class="sec-title">System Capabilities</h2>
+
+      <h3>On-device vision</h3>
+      <p>All vision inference runs directly on the ESP32-S3 LX7 cores using Espressif&rsquo;s <strong>ESP-DL</strong> library with INT8-quantized models. No external accelerator, cloud upload, or network connection is required for detection. Per-frame inference runs in 100&ndash;200 ms, achieving ~5&ndash;10 fps.</p>
+
+      <div class="pill-row">
+        <span class="pill">HumanFaceDetect (MSR + MNP)</span>
+        <span class="pill">Gesture classification</span>
+        <span class="pill">Template IoU matching</span>
+        <span class="pill">Kalman-filtered servo tracking</span>
+        <span class="pill">Skin-blob BFS (YCbCr)</span>
+        <span class="pill">PSRAM frame buffer management</span>
+      </div>
+
+      <h3>Gesture vocabulary</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Gesture</th><th>Trigger Condition</th><th>System Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Open Palm</td>
+              <td>Face present &ge; 2 s, palm facing camera</td>
+              <td>Activate microphone DMA &rarr; capture 3&ndash;5 s audio &rarr; send to LLM &rarr; TTS response</td>
+            </tr>
+            <tr>
+              <td>Point</td>
+              <td>Face present &ge; 2 s, index finger extended</td>
+              <td>Capture PSRAM frame snapshot &rarr; query LLM: &ldquo;What is the object being pointed at?&rdquo; &rarr; TTS</td>
+            </tr>
+            <tr>
+              <td>Closed Fist</td>
+              <td>Any active state</td>
+              <td>Stop current recording or pending LLM call &rarr; return to Face Detected state</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>LLM backend options</h3>
+      <div class="spec-grid">
+        <div class="spec-cell">
+          <div class="spec-cell-label">Groq API</div>
+          <div class="spec-cell-value"><code>llama-4-scout-17b</code><br>~1&ndash;3 s latency<br>Requires internet + API key<br>Orpheus TTS (Diana/Autumn)</div>
+        </div>
+        <div class="spec-cell">
+          <div class="spec-cell-label">Local Gemma 4 2B</div>
+          <div class="spec-cell-value">Fully offline on laptop CPU<br>Zero data egress<br>~10&ndash;30 s latency<br>pyttsx3 TTS</div>
+        </div>
+        <div class="spec-cell">
+          <div class="spec-cell-label">Fallback Policy</div>
+          <div class="spec-cell-value">Groq &rarr; local Gemma on API failure<br>Automatic retry logic<br>Configurable at runtime</div>
+        </div>
+        <div class="spec-cell">
+          <div class="spec-cell-label">Audio Pipeline</div>
+          <div class="spec-cell-value">I2S DMA capture<br>WAV encoding<br>Groq Whisper STT<br>Groq Orpheus TTS</div>
+        </div>
+      </div>
+
+      <h3>Gesture training workflow</h3>
+      <p>MIRA learns the user&rsquo;s specific gesture shapes through a template IoU workflow. No model retraining or firmware recompilation is required. Templates are added over HTTP or the UART console and stored in PSRAM or MicroSD.</p>
+
+      <!-- FIGURE 6: Training sequence -->
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 6 &mdash; Gesture Training Sequence</div>
+        <pre data-lang="sequence">
+  Operator                   ESP32-S3                 PSRAM / MicroSD
+     |                           |                           |
+     |  POST /cmd?op=            |                           |
+     |    gesture_train_start    |                           |
+     |-------------------------->|                           |
+     |                           | mode = GESTURE_TRAIN      |
+     |                           |                           |
+     |  POST /cmd?op=            |                           |
+     |    gesture_label          |                           |
+     |    &value=open_palm       |                           |
+     |-------------------------->|                           |
+     |                           | pending_label = open_palm |
+     |                           |                           |
+     |  [perform gesture]        |                           |
+     |                           |                           |
+     |  POST /cmd?op=mark        |                           |
+     |-------------------------->|                           |
+     |                           | capture ROI frame         |
+     |                           |-------------------------->|
+     |                           |        store template     |
+     |                           |<--------------------------|
+     |                           |                           |
+     |  [repeat for each label]  |                           |
+     |                           |                           |
+     |  POST /cmd?op=            |                           |
+     |    gesture_train_stop     |                           |
+     |-------------------------->|                           |
+     |                           | mode = EXECUTE            |</pre>
+        <p class="fig-caption">Figure 6 &mdash; Operator gesture training sequence over HTTP. Templates persist in PSRAM and optionally on MicroSD across power cycles.</p>
+      </div>
+
+      <h3>Web dashboard endpoints</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>/stream</code></td><td>GET</td><td>Multipart MJPEG camera stream</td></tr>
+            <tr><td><code>/snapshot</code></td><td>GET</td><td>Single raw grayscale frame + metadata response headers (<code>X-Gesture</code>, <code>X-BBox</code>, <code>X-Pan</code>, <code>X-Tilt</code>)</td></tr>
+            <tr><td><code>/detect</code></td><td>GET</td><td>Latest detection JSON (face, gesture, bbox, iou)</td></tr>
+            <tr><td><code>/status</code></td><td>GET</td><td>System state: camera on/off, tracking enabled, detection mode, frame id</td></tr>
+            <tr><td><code>/cmd?op=cam_on</code></td><td>POST</td><td>Activate camera DMA</td></tr>
+            <tr><td><code>/cmd?op=cam_off</code></td><td>POST</td><td>Disable camera DMA</td></tr>
+            <tr><td><code>/cmd?op=track_on</code></td><td>POST</td><td>Enable Kalman servo tracking</td></tr>
+            <tr><td><code>/cmd?op=track_off</code></td><td>POST</td><td>Disable servo tracking</td></tr>
+            <tr><td><code>/cmd?op=mark</code></td><td>POST</td><td>Store current frame as training template</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 PRIVACY & SAFETY -->
+<section id="fault-tolerance">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">06 &middot; Privacy &amp; Safety</p>
+      <h2 class="sec-title">Privacy Architecture &amp; Failure Modes</h2>
+
+      <p>The gesture-gate is not merely a UX convenience &mdash; it is the primary privacy enforcement mechanism. This section formalizes the activation decision flow and the system&rsquo;s behavior under failure conditions.</p>
+
+      <!-- FIGURE 7: Activation decision flow -->
+      <h3>Activation decision flowchart</h3>
+      <div class="fig-wrap">
+        <div class="fig-label">Figure 7 &mdash; Per-Frame Activation Decision Logic</div>
+        <pre data-lang="decision flow">
+New frame received
+        |
+        v
+  Face detected?
+  /           \
+ No           Yes
+  |             |
+  v             v
+Return       Face present >= 2 s?
+to Idle      /              \
+            No              Yes
+             |                |
+             v                v
+       Continue          Gesture detected?
+       gate timer        /            \
+                        No            Yes
+                         |              |
+                         v              v
+                   Remain in      Which gesture?
+                   gate state     /      |      \
+                              open  point   fist
+                              palm    |       |
+                               |      v       v
+                               v   Capture  Cancel
+                            Activate  frame   all
+                            mic DMA    |     active
+                               |       v      ops
+                               v    LLM query
+                            Audio     |
+                            capture   v
+                               |   TTS response
+                               v
+                            LLM query
+                               |
+                               v
+                            TTS response</pre>
+        <p class="fig-caption">Figure 7 &mdash; Per-frame activation decision tree. Privacy-sensitive resources are unreachable without passing through the 2-second face-presence gate.</p>
+      </div>
+
+      <h3>Failure modes and mitigations</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Failure Mode</th><th>Trigger</th><th>System Behavior</th><th>Privacy Impact</th></tr></thead>
+          <tbody>
+            <tr><td>Face false positive</td><td>Object resembles face</td><td>Gate starts; no gesture match likely</td><td>Low: gate prevents audio/LLM activation</td></tr>
+            <tr><td>Gesture false positive</td><td>Incidental hand movement</td><td>Gate checks face presence first</td><td>Low: gate must already be satisfied</td></tr>
+            <tr><td>LLM API timeout</td><td>Network failure</td><td>Auto-fallback to local Gemma 4 2B</td><td>None: no data leaves device on fallback</td></tr>
+            <tr><td>Camera DMA stall</td><td>PSRAM contention</td><td>Frame marked stale; inference skipped</td><td>None: stale frame does not trigger action</td></tr>
+            <tr><td>Power-cycle mid-audio</td><td>Unexpected reset</td><td>Microphone DMA stops immediately</td><td>None: no partial data stored or transmitted</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <strong>Guiding principle:</strong> When uncertain, fail into non-activation. Ambiguity (no clear gesture, stale frame, gate not satisfied) does not trigger activation &mdash; it maintains the idle or gate state. This is the inverse of commercial assistants, which err toward activation.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 DEMO -->
+<section id="demo">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">07 &middot; Demo</p>
+      <h2 class="sec-title">MIRA in Operation</h2>
 
       <div class="video-grid">
-        <div class="video-card">
-          <video controls preload="metadata" poster="">
+        <div class="video-wrap">
+          <video controls preload="metadata">
             <source src="media/demo.mp4" type="video/mp4" />
             Your browser does not support the video element.
           </video>
-          <div class="video-label">
-            <span>Demo</span>
-            Full system demo — face tracking, gesture activation, LLM response
+          <div class="video-caption">
+            <span class="vc-tag">System Demo</span>
+            <span class="vc-title">Full end-to-end demonstration &mdash; face tracking, gesture activation, and LLM response via TTS</span>
           </div>
         </div>
-        <div class="video-card">
-          <video controls preload="metadata" poster="">
+        <div class="video-wrap">
+          <video controls preload="metadata">
             <source src="media/training.mp4" type="video/mp4" />
             Your browser does not support the video element.
           </video>
-          <div class="video-label">
-            <span>Training</span>
-            Gesture template training workflow — teaching MIRA your hand shapes
+          <div class="video-caption">
+            <span class="vc-tag">Training Workflow</span>
+            <span class="vc-title">Gesture template training &mdash; teaching MIRA user-specific hand shapes via template IoU matching</span>
           </div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 06 BUILD -->
-  <section id="build">
-    <div class="section">
-      <p class="section-number">06 · Build &amp; Flash</p>
-      <h2 class="section-title">Quick Start</h2>
+<!-- 08 BUILD -->
+<section id="build">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">08 &middot; Build &amp; Flash</p>
+      <h2 class="sec-title">Quick Start</h2>
 
-      <p>Requirements: <strong>ESP-IDF v5.x or v6.x</strong> (tested on Windows with PowerShell).</p>
+      <p>Requirements: <strong>ESP-IDF v5.x or v6.x</strong> (tested on Windows with PowerShell and Ubuntu 22.04). Python 3.9+ required for the companion.</p>
 
-      <h3>1. Clone &amp; configure</h3>
+      <h3>1 &mdash; Clone &amp; configure</h3>
       <pre data-lang="PowerShell">git clone https://github.com/Shi6aSK/MIRA.git
 cd MIRA
 
-# Set your Wi-Fi credentials in main/vision_config.h before building
-# Edit: #define WIFI_SSID "your_ssid"
-#       #define WIFI_PASS "your_password"</pre>
+# Set Wi-Fi credentials in main/vision_config.h before building:
+#   #define WIFI_SSID "your_ssid"
+#   #define WIFI_PASS "your_password"</pre>
 
-      <h3>2. Build &amp; flash firmware</h3>
+      <h3>2 &mdash; Build &amp; flash firmware</h3>
       <pre data-lang="PowerShell"># Activate ESP-IDF environment (Windows PowerShell)
 . $env:IDF_PATH/export.ps1
 
@@ -959,124 +1096,148 @@ idf.py build
 # Flash and monitor (replace COM3 with your port)
 idf.py -p COM3 flash monitor</pre>
 
-      <h3>3. Run the Python companion</h3>
+      <h3>3 &mdash; Run the Python companion</h3>
       <pre data-lang="bash">cd tools
 pip install -r requirements.txt
 
 # Headless assistant (recommended)
 python assistant.py --host http://192.168.X.X
 
-# GUI viewer
+# GUI frame viewer (serial mode, COM5 or /dev/ttyUSB0)
 python serial_viewer.py</pre>
 
-      <h3>Console Commands (USB-JTAG)</h3>
+      <h3>Console commands (USB-JTAG)</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>Command</th><th>Effect</th></tr>
-          </thead>
+          <thead><tr><th>Command</th><th>Effect</th></tr></thead>
           <tbody>
-            <tr><td><code>stream_on</code></td><td>Enable raw-frame + detection stream</td></tr>
+            <tr><td><code>stream_on</code></td><td>Enable raw-frame + detection JSON stream over USB-JTAG</td></tr>
             <tr><td><code>stream_off</code></td><td>Disable stream</td></tr>
-            <tr><td><code>track_on</code></td><td>Enable servo face-tracking</td></tr>
+            <tr><td><code>track_on</code></td><td>Enable Kalman servo face-tracking</td></tr>
             <tr><td><code>track_off</code></td><td>Disable servo tracking</td></tr>
-            <tr><td><code>status</code></td><td>Print current detection state</td></tr>
+            <tr><td><code>status</code></td><td>Print current detection state, frame id, tracking mode</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 07 CODE -->
-  <section id="code">
-    <div class="section">
-      <p class="section-number">07 · Code</p>
-      <h2 class="section-title">Repository Structure</h2>
+<!-- 09 CODE -->
+<section id="code">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">09 &middot; Code</p>
+      <h2 class="sec-title">Repository Structure</h2>
 
-      <h3>Firmware (ESP32-S3 / ESP-IDF)</h3>
+      <h3>Firmware &mdash; ESP32-S3 / ESP-IDF</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>File</th><th>Purpose</th></tr>
-          </thead>
+          <thead><tr><th>File</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>main/main.c</code></td><td>Entry point — FreeRTOS task creation, peripheral init</td></tr>
-            <tr><td><code>main/camera_control.c</code></td><td>OV2640 init, frame capture, DMA management</td></tr>
-            <tr><td><code>main/vision_pipeline.cpp</code></td><td>ESP-DL INT8 face/gesture inference, template matching</td></tr>
-            <tr><td><code>main/web_server.c</code></td><td>HTTP dashboard — JPEG stream, /detect, /cmd endpoints</td></tr>
-            <tr><td><code>main/servo_control.c</code></td><td>LEDC PWM pan-tilt, Kalman-filtered tracking</td></tr>
-            <tr><td><code>main/oled_control.c</code></td><td>SSD1306 I2C driver, animated eye bitmaps</td></tr>
-            <tr><td><code>main/mic_capture.c</code></td><td>I2S DMA microphone, async audio buffer</td></tr>
-            <tr><td><code>main/wifi_manager.c</code></td><td>Wi-Fi init, IP acquisition</td></tr>
-            <tr><td><code>main/training.c</code></td><td>Template storage for object and gesture training</td></tr>
+            <tr><td><code>main/main.c</code></td><td>Entry point &mdash; FreeRTOS task creation, peripheral initialization, app_main</td></tr>
+            <tr><td><code>main/camera_control.c/.h</code></td><td>OV2640 init, DVP capture, PSRAM frame buffer, DMA management</td></tr>
+            <tr><td><code>main/vision_pipeline.cpp/.h</code></td><td>ESP-DL INT8 HumanFaceDetect, skin-blob BFS gesture classifier, template matching</td></tr>
+            <tr><td><code>main/web_server.c/.h</code></td><td>HTTP dashboard &mdash; MJPEG stream, <code>/detect</code>, <code>/status</code>, <code>/cmd</code>, <code>/snapshot</code></td></tr>
+            <tr><td><code>main/servo_control.c/.h</code></td><td>LEDC PWM pan-tilt driver, Kalman filter state update</td></tr>
+            <tr><td><code>main/oled_control.c/.h</code></td><td>SSD1306 I2C driver, animated eye bitmap renderer, state indicator</td></tr>
+            <tr><td><code>main/mic_capture.c/.h</code></td><td>I2S DMA microphone driver, async audio ring buffer</td></tr>
+            <tr><td><code>main/wifi_manager.c/.h</code></td><td>Wi-Fi station init, IP acquisition, reconnect watchdog</td></tr>
+            <tr><td><code>main/training.c/.h</code></td><td>Template storage, IoU matching, MicroSD persistence</td></tr>
+            <tr><td><code>main/vision_config.h</code></td><td>Compile-time configuration: Wi-Fi, thresholds, GPIO, model paths</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Python Backend</h3>
+      <h3>Python companion</h3>
       <div class="tbl-wrap">
         <table>
-          <thead>
-            <tr><th>File</th><th>Purpose</th></tr>
-          </thead>
+          <thead><tr><th>File</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>tools/assistant.py</code></td><td>Main headless companion — polls /detect, gates audio, calls LLM</td></tr>
-            <tr><td><code>tools/gemma_interface.py</code></td><td>Local Gemma 4 2B loader and inference wrapper</td></tr>
-            <tr><td><code>tools/serial_viewer.py</code></td><td>GUI viewer — raw frame display + detection overlay</td></tr>
-            <tr><td><code>backend/orchestrator.py</code></td><td>Multi-step task router for complex interactions</td></tr>
-            <tr><td><code>backend/ai_router.py</code></td><td>Routes to Ollama (local) or OpenAI/Groq (cloud)</td></tr>
-            <tr><td><code>backend/robot_controller.py</code></td><td>Safe high-level robot command API</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <h3>HTTP API Reference</h3>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>/stream</code></td><td>GET</td><td>Multipart JPEG camera stream</td></tr>
-            <tr><td><code>/snapshot</code></td><td>GET</td><td>Single raw grayscale frame + metadata headers</td></tr>
-            <tr><td><code>/detect</code></td><td>GET</td><td>Latest detection JSON</td></tr>
-            <tr><td><code>/status</code></td><td>GET</td><td>System state summary</td></tr>
-            <tr><td><code>/cmd?op=&lt;op&gt;</code></td><td>POST</td><td>Command: <code>cam_on</code>, <code>cam_off</code>, <code>track_on</code>, <code>track_off</code>, <code>mark</code>, <code>train_start</code>, <code>gesture_label</code>, …</td></tr>
+            <tr><td><code>tools/assistant.py</code></td><td>Main headless companion &mdash; polls <code>/detect</code>, gates audio, calls LLM, runs TTS</td></tr>
+            <tr><td><code>tools/gemma_interface.py</code></td><td>Local Gemma 4 2B model loader and inference wrapper (HuggingFace transformers)</td></tr>
+            <tr><td><code>tools/gemma_proxy.py</code></td><td>Subprocess proxy &mdash; isolates model memory from main process; handles OOM gracefully</td></tr>
+            <tr><td><code>tools/serial_viewer.py</code></td><td>GUI frame viewer &mdash; PyQt5 raw frame display with detection overlay, serial mode</td></tr>
+            <tr><td><code>backend/orchestrator.py</code></td><td>Multi-step task router for complex interaction sequences</td></tr>
+            <tr><td><code>backend/ai_router.py</code></td><td>Routes queries to Ollama (local) or Groq/OpenAI (cloud) based on config</td></tr>
+            <tr><td><code>backend/robot_controller.py</code></td><td>Safe high-level robot command API &mdash; translates intents to servo/display actions</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- FOOTER -->
-  <footer>
-    <p><strong>MIRA</strong> — Multimodal Interactive Recognition Assistant</p>
-    <p>
-      CPRE 5750 / HCI 575 · Computational Perception · Iowa State University, Spring 2026<br>
-      Shobhit Singh ·
-      <a href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">github.com/Shi6aSK/MIRA</a>
-    </p>
-  </footer>
+<!-- 10 COMPARISON -->
+<section id="comparison">
+  <div class="sec">
+    <div class="sec-inner">
+      <p class="sec-num">10 &middot; Comparison</p>
+      <h2 class="sec-title">Comparative Analysis</h2>
+
+      <p>MIRA is compared against three baseline configurations spanning the design space from fully cloud-dependent commercial products to DIY embedded approaches.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Commercial (Alexa / Google)</th>
+              <th>Local LLM only</th>
+              <th>ESP32 + cloud vision</th>
+              <th>MIRA (this work)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Gesture-gated activation</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>On-device vision inference</td><td class="no">No</td><td class="no">No</td><td class="no">No (cloud)</td><td class="yes">Yes (ESP-DL INT8)</td></tr>
+            <tr><td>Zero-screen interface</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes (OLED + TTS)</td></tr>
+            <tr><td>Local LLM option</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td><td class="yes">Yes (Gemma 4 2B)</td></tr>
+            <tr><td>No always-on microphone</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Face-tracking actuation</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes (pan-tilt Kalman)</td></tr>
+            <tr><td>SDT-grounded design</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Under $30 hardware cost</td><td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes (XIAO ESP32-S3)</td></tr>
+            <tr><td>Offline operation</td><td class="no">No</td><td class="yes">Yes</td><td class="no">No</td><td class="yes">Yes (local Gemma)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>References</h3>
+      <ol>
+        <li>R. M. Ryan and E. L. Deci, &ldquo;Self-Determination Theory and the Facilitation of Intrinsic Motivation, Social Development, and Well-Being,&rdquo; <em>American Psychologist</em>, vol. 55, no. 1, pp. 68&ndash;78, 2000.</li>
+        <li>A. Westin, <em>Privacy and Freedom</em>. Atheneum, 1967.</li>
+        <li>D. A. Norman, <em>The Design of Everyday Things</em>. Basic Books, 1988.</li>
+        <li>Espressif Systems, <em>ESP32-S3 Technical Reference Manual</em>, 2023. <a href="https://www.espressif.com/" target="_blank" rel="noopener">espressif.com</a></li>
+        <li>Espressif Systems, ESP-DL &mdash; High-performance deep learning library for ESP SoCs, 2024. <a href="https://github.com/espressif/esp-dl" target="_blank" rel="noopener">github.com/espressif/esp-dl</a></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p><strong>MIRA</strong> &mdash; Multimodal Interactive Recognition Assistant</p>
+  <p>
+    CPRE 5750 / HCI 575 &middot; Computational Perception &middot; Iowa State University, Spring 2026<br>
+    Shobhit Singh &middot;
+    <a href="https://github.com/Shi6aSK/MIRA" target="_blank" rel="noopener">github.com/Shi6aSK/MIRA</a>
+  </p>
+</footer>
 
 </div><!-- /#content -->
 
 <script>
-  // Active nav link on scroll
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('#sidenav a[href^="#"]');
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const id = entry.target.id;
-        navLinks.forEach(a => {
-          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
-        });
+  const secs  = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('#nav a[href^="#"]');
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id;
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
       }
     });
-  }, { rootMargin: '-30% 0px -60% 0px' });
-
-  sections.forEach(s => observer.observe(s));
+  }, { rootMargin: '-22% 0px -68% 0px' });
+  secs.forEach(s => io.observe(s));
 </script>
 
 </body>
