@@ -259,6 +259,12 @@
 
     /* ── FIGURE ── */
     .fig-wrap { margin: 2rem 0; }
+    .diagram-wrap {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 7px; padding: 1.4rem 1.2rem;
+      margin: 1.3rem 0; overflow-x: auto;
+    }
+    .diagram-wrap .mermaid { min-width: 420px; }
     .fig-label {
       font-size: 0.59rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.16em; color: var(--accent); margin-bottom: 0.5rem;
@@ -540,20 +546,31 @@
       <!-- FIGURE 1: Problem space flow -->
       <div class="fig-wrap">
         <div class="fig-label">Figure 1 &mdash; Problem Scope</div>
-        <pre data-lang="problem scope">
-                 BVI User
-                    |
-        +-----------+-----------+
-        |                       |
-  Commercial Path           MIRA Path
-        |                       |
- Always-on mic            Explicit gesture
- Cloud inference          On-device inference
- Screen confirmation       OLED + TTS feedback
- Continuous egress         Zero ambient capture
-        |                       |
-  Privacy risk             Privacy preserved
-  Screen barrier           Accessible interface</pre>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+flowchart LR
+    U["BVI User"]
+    subgraph CP["Commercial Path"]
+        A["Always-on mic"]
+        B["Cloud inference"]
+        C["Screen confirmation"]
+        D["Continuous egress"]
+    end
+    subgraph MP["MIRA Path"]
+        E["Explicit gesture"]
+        F["On-device inference"]
+        G["OLED + TTS feedback"]
+        H["Zero ambient capture"]
+    end
+    U --> CP & MP
+    CP --> BAD["Privacy risk / Screen barrier"]
+    MP --> GOOD["Privacy preserved / Accessible interface"]
+    classDef bad fill:#3d1515,stroke:#c0501a,color:#e8c8c8;
+    classDef good fill:#0f2a1a,stroke:#2d7a4a,color:#a8d8b8;
+    classDef user fill:#1a1a2e,stroke:#e0703a,color:#e0b090;
+    class BAD bad; class GOOD good; class U user;
+          </pre>
+        </div>
         <p class="fig-caption">Figure 1 &mdash; Divergence between commercial assistant design assumptions and BVI user requirements.</p>
       </div>
     </div>
@@ -624,32 +641,37 @@
       <!-- FIGURE 3: System block diagram -->
       <div class="fig-wrap">
         <div class="fig-label">Figure 3 &mdash; End-to-End System Data Flow</div>
-        <pre data-lang="block diagram">
-ESP32-S3 (XIAO Sense)                           Laptop
-+------------------------------------------+    +-------------------------------+
-|                                          |    |                               |
-|  OV2640 RGB565 240x240                   |    |  assistant.py  (headless)     |
-|      |                                   |    |    or                         |
-|      v                                   |    |  serial_viewer.py  (GUI)      |
-|  PSRAM frame buffer (115 KB)             |    |                               |
-|      |                                   |    |  +--------------------------+ |
-|      +---> ESP-DL HumanFaceDetect        |    |  | Gemma 4 2B  (local CPU) | |
-|      |       MSR + MNP INT8              |    |  | Groq API  (cloud)       | |
-|      |                                   |    |  | pyttsx3 TTS             | |
-|      +---> Skin-blob BFS (YCbCr)         |    |  +--------------------------+ |
-|      |       Gesture classifier          |    |                               |
-|      |                                   |    +-------------------------------+
-|      +---> Pan-tilt servo (LEDC PWM)           ^                |
-|      |       Kalman filter                      |   USB-JTAG     |
-|      |                                     RAW_GRAY  DETECT JSON |  CMD text
-|      +---> SSD1306 OLED eyes               <---------+          v
-|      |                                     ----------> HTTP /cmd
-|      +---> /detect /stream HTTP            |
-|      |                                     |
-|  I2S DMA Microphone                        |
-|      (active only on open_palm gesture)    |
-|                                            |
-+------------------------------------------+</pre>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+flowchart TD
+    subgraph ESP["ESP32-S3 (XIAO Sense)"]
+        CAM["OV2640 DVP\n240x240 RGB565"]
+        BUF["PSRAM frame buffer\n~115 KB"]
+        FD["ESP-DL HumanFaceDetect\nMSR + MNP INT8"]
+        SERVO["Pan-tilt servo\nKalman filter"]
+        OLED["SSD1306 OLED\neye animation"]
+        GES["Skin-blob BFS\nGesture classifier"]
+        HTTP["/detect /stream\nHTTP endpoints"]
+        MIC["I2S DMA Microphone\nopen_palm only"]
+        CAM --> BUF --> FD
+        FD --> SERVO & OLED & GES
+        GES --> HTTP
+    end
+    subgraph LAPTOP["Laptop Python Companion"]
+        ASS["assistant.py\nserial_viewer.py"]
+        LLM["Gemma 4 2B (local)\nGroq API (cloud)"]
+        TTS["pyttsx3 / Orpheus TTS"]
+        ASS --> LLM --> TTS
+    end
+    HTTP -->|RAW_GRAY + DETECT JSON\nUSB-JTAG| ASS
+    ASS -->|CMD text\nHTTP| HTTP
+    GES -->|open_palm triggers| MIC
+    classDef esp fill:#1a1020,stroke:#c0501a,color:#e0c0b0;
+    classDef lap fill:#101a10,stroke:#2d7a4a,color:#b0d0b0;
+    class CAM,BUF,FD,SERVO,OLED,GES,HTTP,MIC esp;
+    class ASS,LLM,TTS lap;
+          </pre>
+        </div>
         <p class="fig-caption">Figure 3 &mdash; Full system data flow. The ESP32-S3 handles sensing, inference, and actuation. The laptop handles LLM and TTS. Communication is bidirectional over USB-JTAG and HTTP.</p>
       </div>
 
@@ -671,47 +693,37 @@ ESP32-S3 (XIAO Sense)                           Laptop
       <h3>Interaction state machine</h3>
       <div class="fig-wrap">
         <div class="fig-label">Figure 4 &mdash; Activation State Machine</div>
-        <pre data-lang="state machine">
-         +-------------------+
-         |       IDLE        |  Camera DMA off. Servo resting.
-         |   low-power wait  |  OLED: resting eye state.
-         +-------------------+
-                  |
-          face_detected
-                  |
-                  v
-         +-------------------+
-         |  FACE_DETECTED    |  Camera active. Servo tracking.
-         |  2-s gate starts  |  OLED eyes follow face position.
-         +-------------------+
-                  |
-          gate_elapsed (2 s)
-                  |
-                  v
-         +-------------------+
-         |  GESTURE_GATE     |  Monitoring gesture within face ROI.
-         |  awaiting signal  |  No audio or action until signal.
-         +-------------------+
-           |         |         |
-     open_palm      point   closed_fist
-           |         |         |
-           v         v         v
-     +---------+ +--------+ +----------+
-     |  VOICE  | | VISION | | CANCEL   |
-     | mic DMA | | frame  | | -> FACE  |
-     | -> LLM  | | -> LLM | | _DETECTED|
-     | -> TTS  | | -> TTS | +----------+
-     +---------+ +--------+
-           |         |
-    response complete
-           |         |
-           +----+----+
-                |
-                v
-         +-------------------+
-         |  FACE_DETECTED    |  Return to tracking state.
-         +-------------------+</pre>
-        <p class="fig-caption">Figure 4 &mdash; Six-state interaction FSM. Privacy-sensitive resources (microphone DMA, LLM API) are only accessible from the VOICE or VISION states, which require traversal through the 2-second face-presence gate.</p>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+stateDiagram-v2
+    direction TD
+    [*] --> Idle
+    Idle --> FaceDetected : face_detected
+    FaceDetected --> Idle : face_lost
+    FaceDetected --> GestureGate : gate_elapsed (2 s)
+    GestureGate --> FaceDetected : face_lost / closed_fist
+    GestureGate --> Voice : open_palm
+    GestureGate --> Vision : point
+    Voice --> FaceDetected : response_complete
+    Vision --> FaceDetected : response_complete
+
+    state Idle {
+        note: Camera DMA off · Servo resting\nMin power draw
+    }
+    state FaceDetected {
+        note: Camera active · Servo tracking\n2-s presence gate
+    }
+    state GestureGate {
+        note: Monitoring gesture in ROI\nNo mic / LLM / network
+    }
+    state Voice {
+        note: Mic DMA active · Audio captured\nLLM query · TTS response
+    }
+    state Vision {
+        note: Frame snapshot captured\nLLM object query · TTS
+    }
+          </pre>
+        </div>        <p class="fig-caption">Figure 4 &mdash; Six-state interaction FSM. Privacy-sensitive resources (microphone DMA, LLM API) are only accessible from the VOICE or VISION states, which require traversal through the 2-second face-presence gate.</p>
       </div>
 
       <h3>State definitions</h3>
@@ -739,41 +751,25 @@ ESP32-S3 (XIAO Sense)                           Laptop
       <h3>Vision pipeline</h3>
       <div class="fig-wrap">
         <div class="fig-label">Figure 5 &mdash; On-Device Vision Pipeline</div>
-        <pre data-lang="pipeline">
-OV2640 DVP capture
-        |
-        v
- PSRAM frame buffer   240x240 RGB565  (~115 KB)
-        |
-        +-----> JPEG encode -------> /stream HTTP (MJPEG)
-        |
-        v
- ESP-DL HumanFaceDetect (INT8)
-   MSR model: candidate detection
-   MNP model: landmark regression
-        |
-        +-- no face --> back to idle
-        |
-        v
- Face ROI extracted (bbox)
-        |
-        +-----> Servo controller
-        |        Kalman filter (pan/tilt)
-        |        LEDC PWM update
-        |
-        +-----> OLED eye renderer
-        |        eye position = face center
-        |
-        v
- Skin-blob BFS within ROI (YCbCr color space)
-        |
-        v
- Gesture classifier
-   Template IoU matching against stored templates
-        |
-        v
- Detection JSON --> /detect endpoint + USB-JTAG stream</pre>
-        <p class="fig-caption">Figure 5 &mdash; Full on-device vision pipeline from frame capture to detection output. All processing runs on ESP32-S3 LX7 cores with no external compute.</p>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+flowchart TD
+    CAM["OV2640 DVP capture"] --> BUF["PSRAM frame buffer\n240x240 RGB565 · ~115 KB"]
+    BUF -->|parallel| MJPEG["JPEG encode\n→ /stream HTTP (MJPEG)"]
+    BUF --> DET["ESP-DL HumanFaceDetect INT8\nMSR: candidate detection\nMNP: landmark regression"]
+    DET -->|no face| BACK["Return to Idle state"]
+    DET -->|face found| ROI["Face ROI extracted\n(bounding box + landmarks)"]
+    ROI --> SERVO["Servo controller\nKalman filter · LEDC PWM"]
+    ROI --> OLED["OLED eye renderer\neye pos = face center"]
+    ROI --> BFS["Skin-blob BFS\n(YCbCr color space)"]
+    BFS --> GES["Gesture classifier\nTemplate IoU matching"]
+    GES --> OUT["/detect JSON\n+ USB-JTAG stream"]
+    classDef sensor fill:#1a1020,stroke:#c0501a,color:#e0b090;
+    classDef output fill:#0f1a2e,stroke:#3b82f6,color:#a0c0e0;
+    classDef inactive fill:#1a1a1a,stroke:#444,color:#777;
+    class CAM,BUF sensor; class OUT,MJPEG output; class BACK inactive;
+          </pre>
+        </div>        <p class="fig-caption">Figure 5 &mdash; Full on-device vision pipeline from frame capture to detection output. All processing runs on ESP32-S3 LX7 cores with no external compute.</p>
       </div>
     </div>
   </div>
@@ -909,36 +905,26 @@ OV2640 DVP capture
       <!-- FIGURE 6: Training sequence -->
       <div class="fig-wrap">
         <div class="fig-label">Figure 6 &mdash; Gesture Training Sequence</div>
-        <pre data-lang="sequence">
-  Operator                   ESP32-S3                 PSRAM / MicroSD
-     |                           |                           |
-     |  POST /cmd?op=            |                           |
-     |    gesture_train_start    |                           |
-     |-------------------------->|                           |
-     |                           | mode = GESTURE_TRAIN      |
-     |                           |                           |
-     |  POST /cmd?op=            |                           |
-     |    gesture_label          |                           |
-     |    &value=open_palm       |                           |
-     |-------------------------->|                           |
-     |                           | pending_label = open_palm |
-     |                           |                           |
-     |  [perform gesture]        |                           |
-     |                           |                           |
-     |  POST /cmd?op=mark        |                           |
-     |-------------------------->|                           |
-     |                           | capture ROI frame         |
-     |                           |-------------------------->|
-     |                           |        store template     |
-     |                           |<--------------------------|
-     |                           |                           |
-     |  [repeat for each label]  |                           |
-     |                           |                           |
-     |  POST /cmd?op=            |                           |
-     |    gesture_train_stop     |                           |
-     |-------------------------->|                           |
-     |                           | mode = EXECUTE            |</pre>
-        <p class="fig-caption">Figure 6 &mdash; Operator gesture training sequence over HTTP. Templates persist in PSRAM and optionally on MicroSD across power cycles.</p>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Op as Operator
+    participant ESP as ESP32-S3
+    participant MEM as PSRAM / MicroSD
+    Op->>ESP: POST /cmd?op=gesture_train_start
+    ESP-->>Op: mode = GESTURE_TRAIN
+    Op->>ESP: POST /cmd?op=gesture_label&value=open_palm
+    ESP-->>Op: pending_label = open_palm
+    Note over Op: Perform gesture in front of camera
+    Op->>ESP: POST /cmd?op=mark
+    ESP->>MEM: capture ROI frame + store template
+    MEM-->>ESP: stored ok
+    Note over Op,ESP: Repeat for each gesture label
+    Op->>ESP: POST /cmd?op=gesture_train_stop
+    ESP-->>Op: mode = EXECUTE
+          </pre>
+        </div>        <p class="fig-caption">Figure 6 &mdash; Operator gesture training sequence over HTTP. Templates persist in PSRAM and optionally on MicroSD across power cycles.</p>
       </div>
 
       <h3>Web dashboard endpoints</h3>
@@ -975,44 +961,32 @@ OV2640 DVP capture
       <h3>Activation decision flowchart</h3>
       <div class="fig-wrap">
         <div class="fig-label">Figure 7 &mdash; Per-Frame Activation Decision Logic</div>
-        <pre data-lang="decision flow">
-New frame received
-        |
-        v
-  Face detected?
-  /           \
- No           Yes
-  |             |
-  v             v
-Return       Face present >= 2 s?
-to Idle      /              \
-            No              Yes
-             |                |
-             v                v
-       Continue          Gesture detected?
-       gate timer        /            \
-                        No            Yes
-                         |              |
-                         v              v
-                   Remain in      Which gesture?
-                   gate state     /      |      \
-                              open  point   fist
-                              palm    |       |
-                               |      v       v
-                               v   Capture  Cancel
-                            Activate  frame   all
-                            mic DMA    |     active
-                               |       v      ops
-                               v    LLM query
-                            Audio     |
-                            capture   v
-                               |   TTS response
-                               v
-                            LLM query
-                               |
-                               v
-                            TTS response</pre>
-        <p class="fig-caption">Figure 7 &mdash; Per-frame activation decision tree. Privacy-sensitive resources are unreachable without passing through the 2-second face-presence gate.</p>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+flowchart TD
+    START(["New frame received"]) --> FD{"Face\ndetected?"}
+    FD -->|No| IDLE["Return to Idle\nCamera DMA off"]
+    FD -->|Yes| GATE{"Face present\n≥ 2 seconds?"}
+    GATE -->|No| TIMER["Continue gate timer\nstay in FaceDetected"]
+    GATE -->|Yes| GES{"Gesture\ndetected?"}
+    GES -->|No| REMAIN["Remain in Gesture Gate\nwait for next frame"]
+    GES -->|Yes| WHICH{"Which\ngesture?"}
+    WHICH -->|open_palm| MIC["Activate mic DMA\nCapture 3-5 s audio\n→ LLM → TTS"]
+    WHICH -->|point| SNAP["Capture frame snapshot\nQuery LLM: object ID\n→ TTS"]
+    WHICH -->|closed_fist| CANCEL["Cancel active ops\nReturn to FaceDetected"]
+    MIC --> DONE(["FaceDetected state"])
+    SNAP --> DONE
+    CANCEL --> DONE
+    classDef decision fill:#2a1a0a,stroke:#c0501a,color:#e0b090;
+    classDef action fill:#0a1a2a,stroke:#3b82f6,color:#a0c0e0;
+    classDef terminal fill:#1a2a1a,stroke:#2d7a4a,color:#a8d8b8;
+    classDef idle fill:#1a1a1a,stroke:#444,color:#777;
+    class FD,GATE,GES,WHICH decision;
+    class MIC,SNAP,CANCEL action;
+    class DONE,START terminal;
+    class IDLE,TIMER,REMAIN idle;
+          </pre>
+        </div>        <p class="fig-caption">Figure 7 &mdash; Per-frame activation decision tree. Privacy-sensitive resources are unreachable without passing through the 2-second face-presence gate.</p>
       </div>
 
       <h3>Failure modes and mitigations</h3>
@@ -1240,5 +1214,33 @@ python serial_viewer.py</pre>
   secs.forEach(s => io.observe(s));
 </script>
 
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#101012',
+      primaryColor: '#1e1e24',
+      primaryBorderColor: '#c0501a',
+      primaryTextColor: '#eaeaed',
+      secondaryColor: '#16161a',
+      tertiaryColor: '#18181c',
+      lineColor: '#65656e',
+      edgeLabelBackground: '#101012',
+      clusterBkg: '#131316',
+      clusterBorder: '#252528',
+      titleColor: '#e0703a',
+      nodeBorder: '#252528',
+      mainBkg: '#1e1e24',
+      fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
+      fontSize: '13px'
+    },
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+    sequence:   { useMaxWidth: true, actorFontFamily: 'Inter, sans-serif' },
+    stateDiagram: { useMaxWidth: true }
+  });
+</script>
 </body>
 </html>
