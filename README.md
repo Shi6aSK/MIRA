@@ -271,3 +271,7 @@ Use these optional environment variables on the host to trade response quality f
 - How this split maps to computational perception goals:
   - Edge (ESP32-S3): perform only the minimal, fast perception tasks required to detect presence, faces, and gestures — produce compact metadata and short snapshots.
   - Host (Laptop): run heavier models (LLMs, large detectors, object recognizers) against captured frames or user prompts to provide richer UI and reasoning while keeping raw data transfer minimal and user-controlled.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
